@@ -1,3 +1,4 @@
+"use strict";
 (function (G) {
     if (!G.$vms) return console.error('Vimesh style core is not loaded!')
     const E = G.$vms._.each
@@ -259,4 +260,4 @@
     E(['none', 'auto'], v => R(`pointer-events-${v}`, `pointer-events: ${v};`))
     E({none: 'none', y : 'vertical', x:'horizontal', _:'both'}, (v, k) => R(`resize${k == '_' ? '' : `-${k}`}`, `resize: ${v};`))
     E(['none', 'text', 'all', 'auto'], v => R(`select-${v}`, `user-select: ${v};`))
-})(window)
+})(window);

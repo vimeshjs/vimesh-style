@@ -1,6 +1,6 @@
 {
-  "name": "vimesh-style",
-  "version": "0.9.0",
+  "name": "@vimesh/style",
+  "version": "0.9.3",
   "repository": "https://github.com/vimeshjs/vimesh-style.git",
   "author": "Jacky ZHANG <xinjie.zhang@gmail.com>",
   "license": "MIT",

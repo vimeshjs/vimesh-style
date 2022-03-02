@@ -1,3 +1,4 @@
+"use strict";
 (function (G) {
     if (!G.$vms) return console.error('Vimesh style core is not loaded!')
     const E = G.$vms._.each
@@ -227,4 +228,4 @@
     R(`table-auto`, `table-layout: auto;`)
     R(`table-fixed`, `table-layout: fixed;`)
 
-})(window)
+})(window);

@@ -1,3 +1,4 @@
+"use strict";
 (function (G) {
     if (G.$vms) return // Vimesh style core is already loaded    
     G.$vms = {
@@ -58,24 +59,17 @@
         const observer = new MutationObserver(callback)
         observer.observe(target, { attributes: true, childList: true, subtree: true })
     }
+    let ready = false
+    let listeners = []
+    if (D.addEventListener) {
+        D.addEventListener('DOMContentLoaded', () => {
+            ready = true;
+            while (listeners[0])
+                listeners.shift()()
+        }, false);
+    }
     function domReady(callback) {
-        if (D.addEventListener) {
-            D.addEventListener('DOMContentLoaded', () => {
-                D.removeEventListener('DOMContentLoaded', arguments.callee, false);
-                callback();
-            }, false)
-        }
-        else if (D.attachEvent) {
-            D.attachEvent('onreadystatechange', () => {
-                if (D.readyState == "complete") {
-                    D.detachEvent('onreadystatechange', arguments.callee);
-                    callback();
-                }
-            })
-        }
-        else if (D.lastChild == D.body) {
-            callback();
-        }
+        callback && (ready ? callback() : listeners.push(callback))
     }
     domReady(() => {
         styleElement = D.createElement('style')
@@ -417,7 +411,7 @@
         })
     }
     function generateSizes(handler) {
-        for (i = 0; i <= 96; i++) {
+        for (let i = 0; i <= 96; i++) {
             if (i == 13 || i == 15 || (i >= 16 && (i - 16) % 4 != 0)) continue
             handler(i, `${i * 0.25}${0 == i ? 'px' : 'rem'}`)
             if (1 == i) handler('px', '1px')
@@ -440,4 +434,4 @@
         resolveAllKnownClasses,
         addClassesToAutoStyles
     })
-})(window)
+})(window);
