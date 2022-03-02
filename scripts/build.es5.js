@@ -9,7 +9,7 @@ const dirSrc = `${root}/src`
 
 if (!fs.existsSync(dirDist)) fs.mkdirSync(dirDist)
 
-let files = ['vms-core.js', 'vms-layout.js', 'vms-paint.js']
+let files = ['vms-core.js', 'vms-preset.js', 'vms-layout.js', 'vms-paint.js']
 
 let code = _.map(files, f => babel.transformSync(fs.readFileSync(`${dirSrc}/${f}`), { presets: ['@babel/preset-env'] }).code).join('')
 let result = `// Vimesh Style (ES5) v${version}\r\n` + UglifyJS.minify(code).code

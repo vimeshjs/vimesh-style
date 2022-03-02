@@ -5,15 +5,49 @@
         config: {
             auto: true,
             prefix: 'vms',
+            preset: true,
             breakpoints: {
                 sm: 640,
                 md: 768,
                 lg: 1024,
                 xl: 1280,
                 '2xl': 1536
+            },
+            fonts: {
+                sans: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',
+                serif: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
+                mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
+            },
+            colors: {
+                rose: 'f43f5e',
+                pink: 'ec4899',
+                fuchsia: 'd946ef',
+                purple: 'a855f7',
+                violet: '8b5cf6',
+                indigo: '6366f1',
+                blue: '3b82f6',
+                sky: '0ea5e9',
+                lightBlue: '0ea5e9',
+                cyan: '06b6d4',
+                teal: '14b8a6',
+                emerald: '10b981',
+                green: '22c55e',
+                lime: '84cc16',
+                yellow: 'eab308',
+                amber: 'f59e0b',
+                orange: 'f97316',
+                red: 'ef4444',
+                gray: ['#fafafa', '#f4f4f5', '#e4e4e7', '#d4d4d8', '#a1a1aa', '#71717a', '#52525b', '#3f3f46', '#27272a', '#18181b']
+            },
+            specialColors: {
+                white: '#ffffff',
+                black: '#000000',
+                transparent: 'transparent',
+                current: 'currentColor'
             }
         }
     }
+
     const $vms = G.$vms
     const C = $vms.config
     const D = document
@@ -96,6 +130,7 @@
     let enabledClasses = {}
     let classMap = $vms.classMap = {}
     let initMap = {}
+    let presetStyles = []
     let autoStyles = []
     let initStyles = []
     let customStyles = []
@@ -152,9 +187,10 @@
         return style
     }
     function updateAutoStyles() {
-        if (styleElement) {
+        let all = initStyles.concat(autoStyles, customStyles)
+        if (styleElement && all.length > 0) {
             let styles1 = styleElement.innerHTML
-            let styles2 = initStyles.concat(autoStyles, customStyles).join('\n')
+            let styles2 = (C.preset ? presetStyles : []).concat(all).join('\n')
             if (styles1 !== styles2)
                 styleElement.innerHTML = styles2
         }
@@ -162,6 +198,12 @@
     function addCustomStyle(style) {
         if (customStyles.indexOf(style) == -1) {
             customStyles.push(style)
+            updateAutoStyles()
+        }
+    }
+    function addPresetStyle(style) {
+        if (presetStyles.indexOf(style) == -1) {
+            presetStyles.push(style)
             updateAutoStyles()
         }
     }
@@ -339,33 +381,6 @@
         return rgbToHex(rgb)
     }
 
-    C.colors = {
-        rose: 'f43f5e',
-        pink: 'ec4899',
-        fuchsia: 'd946ef',
-        purple: 'a855f7',
-        violet: '8b5cf6',
-        indigo: '6366f1',
-        blue: '3b82f6',
-        sky: '0ea5e9',
-        lightBlue: '0ea5e9',
-        cyan: '06b6d4',
-        teal: '14b8a6',
-        emerald: '10b981',
-        green: '22c55e',
-        lime: '84cc16',
-        yellow: 'eab308',
-        amber: 'f59e0b',
-        orange: 'f97316',
-        red: 'ef4444',
-        gray: '71717a'
-    }
-    C.specialColors = {
-        white: '#ffffff',
-        black: '#000000',
-        transparent: 'transparent',
-        current: 'currentColor'
-    }
     function resolveColor(name) {
         if (!name) return null
         let cv = null
@@ -391,6 +406,7 @@
             if (!color) return null
             let w = depth ? +depth : 500
             let index = 50 === w ? 1 : (w / 100) + 1
+            if (isArray(color)) return color[index - 1]
             let hex = colorPalette(color, index)
             cv = hexToRgb(hex)
         }
@@ -428,10 +444,13 @@
         generateColors,
         generateSizes,
         resolveClass,
+        addPresetStyle,
         addInitStyle,
         addCustomStyle,
         updateAutoStyles,
         resolveAllKnownClasses,
         addClassesToAutoStyles
     })
+
+    if (G.vmsReady) G.vmsReady($vms)
 })(window);

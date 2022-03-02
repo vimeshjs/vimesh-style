@@ -10,12 +10,6 @@
     const { rgbToHex, resolveColor, addInitStyle, _: { isString } } = $vms
     let i
 
-    C.fonts = {
-        sans: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',
-        serif: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
-        mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
-    }
-
     // Font
     R('font-', classDetails => {
         let parts = classDetails.name.split('-')
@@ -115,9 +109,8 @@
         })
     })
     E([0, 1, 2, 4, 8], w => {
-        let s = `border-width: ${w}px;`
-        R(`border${w == 1 ? '' : `-${w}`}`, s)
-        E(Object.keys(DM), d => R(`border-${d}${w == 1 ? '' : `-${w}`}`, s))
+        R(`border${w == 1 ? '' : `-${w}`}`, `border-width: ${w}px;`)
+        E(Object.keys(DM), d => R(`border-${d}${w == 1 ? '' : `-${w}`}`, `border-${DM[d]}-width: ${w}px;`))
     })
     GC('border', 'border-color')
     E(['solid', 'dashed', 'dotted', 'double', 'none'], v => R(`border-${v}`, `border-style: ${v};`))
@@ -258,6 +251,10 @@
     E(['auto', 'default', 'pointer', 'wait', 'text', 'move', 'help', 'not-allowed'], v => R(`cursor-${v}`, `cursor: ${v};`))
     E(['none', 'white', 'black'], v => R(`outline-${v}`, `outline: 2px ${v == 'none' ? 'solid transparent' : `dotted ${v}`}; outline-offset: 2px;`))
     E(['none', 'auto'], v => R(`pointer-events-${v}`, `pointer-events: ${v};`))
-    E({none: 'none', y : 'vertical', x:'horizontal', _:'both'}, (v, k) => R(`resize${k == '_' ? '' : `-${k}`}`, `resize: ${v};`))
+    E({ none: 'none', y: 'vertical', x: 'horizontal', _: 'both' }, (v, k) => R(`resize${k == '_' ? '' : `-${k}`}`, `resize: ${v};`))
     E(['none', 'text', 'all', 'auto'], v => R(`select-${v}`, `user-select: ${v};`))
+
+    // Screen Readers
+    R(`sr-only`, `position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0;`)
+    R(`not-sr-only`, `position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; white-space: normal;`)
 })(window);
