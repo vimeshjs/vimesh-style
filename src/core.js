@@ -1,10 +1,10 @@
 "use strict";
 (function (G) {
-    if (G.$vms) return // Vimesh style core is already loaded    
-    G.$vms = {
+    if (G.$vs) return // Vimesh style core is already loaded    
+    G.$vs = {
         config: {
             auto: true,
-            prefix: 'vms',
+            prefix: 'vs',
             preset: true,
             breakpoints: {
                 sm: 640,
@@ -61,8 +61,8 @@
         }
     }
 
-    const $vms = G.$vms
-    const C = $vms.config
+    const $vs = G.$vs
+    const C = $vs.config
     const D = document
     function isString(str) {
         return (str != null && typeof str.valueOf() === "string")
@@ -95,7 +95,7 @@
         }
         return target
     }
-    $vms._ = { isString, isArray, isFunction, each, extend }
+    $vs._ = { isString, isArray, isFunction, each, extend }
 
     function domChange(target, callback) {
         if (undefined === callback) {
@@ -140,15 +140,15 @@
             }
         }
     }
-    let enabledClasses = {}
-    let classMap = $vms.classMap = {}
+    let addedClasses = {}
+    let classMap = $vs.classMap = {}
     let initMap = {}
     let presetStyles = []
     let autoStyles = []
     let initStyles = []
     let customStyles = []
     let styleElement = null
-    let generators = $vms.generators = []
+    let generators = $vs.generators = []
 
     function decomposeClassName(className) {
         if (isString(className)) {
@@ -230,7 +230,7 @@
         if (classes) {
             if (isString(classes)) classes = classes.split(' ')
             each(classes, name => {
-                if (!name || enabledClasses[name]) return
+                if (!name || addedClasses[name]) return
                 let style = resolveClass(name)
                 if (style) {
                     let classDetails = decomposeClassName(name)
@@ -251,14 +251,19 @@
                     } else {
                         style = `.${fullname} ${style} `
                     }
-                    enabledClasses[name] = true
+                    addedClasses[name] = true
                     autoStyles.push(style)
                 }
             })
             updateAutoStyles()
         }
     }
-
+    function resetAutoStyles(){
+        addedClasses = {}
+        autoStyles = []
+        if (styleElement)
+            styleElement.innerHTML = null
+    }
     const hueStep = 2;
     const saturationStep = 0.16;
     const saturationStep2 = 0.05;
@@ -447,7 +452,7 @@
             if (i <= 3) handler(i + 0.5, `${i * 0.25 + 0.125}rem`)
         }
     }
-    extend($vms, {
+    extend($vs, {
         domReady,
         domChange,
         hexToRgb,
@@ -461,9 +466,10 @@
         addInitStyle,
         addCustomStyle,
         updateAutoStyles,
+        resetAutoStyles,
         resolveAllKnownClasses,
         addClassesToAutoStyles
     })
 
-    if (G.vmsReady) G.vmsReady($vms)
+    if (G.vsSetup) G.vsSetup($vs)
 })(window);

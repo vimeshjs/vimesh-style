@@ -12,4 +12,4 @@ let files = ['core.js', 'preset.js', 'layout.js', 'paint.js']
 
 let code = _.map(files, f => fs.readFileSync(`${dirSrc}/${f}`)).join('')
 let result = `// Vimesh Style v${version}\r\n` + UglifyJS.minify(code).code
-fs.writeFileSync(`${dirDist}/vms.min.js`, result)
+fs.writeFileSync(`${dirDist}/vs.js`, result)

@@ -13,5 +13,5 @@ let files = ['core.js', 'preset.js', 'layout.js', 'paint.js']
 
 let code = _.map(files, f => babel.transformSync(fs.readFileSync(`${dirSrc}/${f}`), { presets: ['@babel/preset-env'] }).code).join('')
 let result = `// Vimesh Style (ES5) v${version}\r\n` + UglifyJS.minify(code).code
-fs.writeFileSync(`${dirDist}/vms.es5.min.js`, result)
+fs.writeFileSync(`${dirDist}/vs.es5.js`, result)
 

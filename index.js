@@ -1,4 +1,6 @@
-require('./src/core')
-require('./src/preset')
-require('./src/layout')
-require('./src/paint')
+if (typeof window !== 'undefined') {
+    require('./src/core')
+    require('./src/preset')
+    require('./src/layout')
+    require('./src/paint')
+}

@@ -1,10 +1,10 @@
 "use strict";
 (function (G) {
-    if (!G.$vms) return console.error('Vimesh style core is not loaded!')
-    const E = G.$vms._.each
-    const R = G.$vms.register
-    const GS = G.$vms.generateSizes
-    const C = G.$vms.config
+    if (!G.$vs) return console.error('Vimesh style core is not loaded!')
+    const E = G.$vs._.each
+    const R = G.$vs.register
+    const GS = G.$vs.generateSizes
+    const C = G.$vs.config
     const P = C.prefix
     let i
 
