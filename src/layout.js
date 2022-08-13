@@ -73,6 +73,20 @@
     })
 
     // Padding & Margin 
+    function generateMargins(s, name, value) {
+        R(`${s}m-${name}`, `margin: ${s}${value};`)
+        const ml = `margin-left: ${s}${value};`
+        const mr = `margin-right: ${s}${value};`
+        const mt = `margin-top: ${s}${value};`
+        const mb = `margin-bottom: ${s}${value};`
+        R(`${s}mx-${name}`, `${ml}${mr}`)
+        R(`${s}ml-${name}`, `${ml}`)
+        R(`${s}mr-${name}`, `${mr}`)
+        R(`${s}my-${name}`, `${mt}${mb}`)
+        R(`${s}mt-${name}`, `${mt}`)
+        R(`${s}mb-${name}`, `${mb}`)
+    }
+    generateMargins('', 'auto', 'auto')
     GS((name, value) => {
         R(`p-${name}`, `padding: ${value};`)
         const pl = `padding-left: ${value};`
@@ -86,19 +100,7 @@
         R(`pt-${name}`, `${pt}`)
         R(`pb-${name}`, `${pb}`)
 
-        E(['', '-'], s => {
-            R(`${s}m-${name}`, `margin: ${s}${value};`)
-            const ml = `margin-left: ${s}${value};`
-            const mr = `margin-right: ${s}${value};`
-            const mt = `margin-top: ${s}${value};`
-            const mb = `margin-bottom: ${s}${value};`
-            R(`${s}mx-${name}`, `${ml}${mr}`)
-            R(`${s}ml-${name}`, `${ml}`)
-            R(`${s}mr-${name}`, `${mr}`)
-            R(`${s}my-${name}`, `${mt}${mb}`)
-            R(`${s}mt-${name}`, `${mt}`)
-            R(`${s}mb-${name}`, `${mb}`)
-        })
+        E(['', '-'], s => generateMargins(s, name, value))
     })
 
     // Top / Right / Bottom / Left
