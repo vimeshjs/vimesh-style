@@ -5,7 +5,7 @@
   "repository": "https://github.com/vimeshjs/vimesh-style.git",
   "author": "Jacky ZHANG <xinjie.zhang@gmail.com>",
   "license": "MIT",
-  "unpkg": "dist/vm.js",
+  "unpkg": "dist/vs.js",
   "scripts": {
     "clean": "rimraf dist/*",
     "build": "node scripts/build.js",
