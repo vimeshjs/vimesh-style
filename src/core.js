@@ -102,7 +102,6 @@
     let presetStyles = []
     let autoStyles = []
     let initStyles = []
-    let customStyles = []
     let styleElement = null
     let stylesOutput = null
     let generators = $vs.generators = []
@@ -160,7 +159,7 @@
         return style
     }
     function updateAutoStyles() {
-        let all = initStyles.concat(autoStyles, customStyles)
+        let all = initStyles.concat(autoStyles)
         if (all.length > 0) {
             let newStyles = (C.preset ? presetStyles : []).concat(all).join('\n')
             if (newStyles !== stylesOutput) {
@@ -182,7 +181,7 @@
             updateAutoStyles()
         }
     }
-    function addClasses(classes) {
+    function addClasses(classes, update = true) {
         if (classes) {
             if (isString(classes)) classes = classes.split(' ')
             each(classes, name => {
@@ -211,23 +210,22 @@
                     autoStyles.push(style)
                 }
             })
-            updateAutoStyles()
+            if (update) updateAutoStyles()
         }
     }
-    function resolveAllKnownClasses(root) {
-        let all = root.querySelectorAll('*[class]')
-        let max = all.length
+    function resolveAllKnownClasses(root, update) {
+        let all = [root, ...root.querySelectorAll('*[class]')]
         let allClasses = []
-        for (let i = 0; i < max; i++) {
-            let cn = all[i].className
+        each(all, el => {
+            let cn = el.className
             if (cn) {
                 allClasses.push(cn)
                 // SVGAnimatedString
                 if (cn.baseVal) allClasses.push(cn.baseVal)
                 if (cn.animVal) allClasses.push(cn.animVal)
             }
-        }
-        addClasses(allClasses.join(' '))
+        })
+        addClasses(allClasses.join(' '), update)
     }
     function resetAutoStyles() {
         addedClasses = {}
@@ -489,14 +487,23 @@
                 D.head.appendChild(styleElement)
             }
             updateAutoStyles()
-            if (C.auto) resolveAllKnownClasses(D.body)
+            if (C.auto) resolveAllKnownClasses(D.body, true)
             if (stylesOutput && stylesOutput !== styleElement.innerHTML)
                 styleElement.innerHTML = stylesOutput
         })
-        domChange(() => {
-            console.log(arguments)
-            if (C.auto) resolveAllKnownClasses(D.body)
+        domChange((mutations) => {
+            if (C.auto) {
+                each(mutations, m => {
+                    if (m.type === 'childList') {
+                        m.addedNodes.forEach(node => resolveAllKnownClasses(node, false))
+                    } else if (m.type === 'attributes') {
+                        if (m.attributeName === 'class') {
+                            addClasses(m.target.getAttribute('class'), false)
+                        }
+                    }
+                })
+                updateAutoStyles()
+            }
         })
     }
-
 })(typeof window !== 'undefined' && window || global);

@@ -1,0 +1,32 @@
+<html>
+
+<head>
+    <script src="../../src/core.js"></script>
+    <script src="../../src/preset.js"></script>
+    <script src="../../src/paint.js"></script>
+    <script src="../../src/layout.js"></script>
+</head>
+
+<body>
+    <div id="container" class="m-4 shadow-sm bg-purple-100 rounded">
+
+    </div>
+    <script>
+        let index = 0
+        let timer = setInterval(() => {
+            let elDiv = document.createElement('div')
+            if (index > 0) {
+                let elPrev = document.getElementById(`ID-${index}`)
+                elPrev.setAttribute('class', `text-red-${(index - 1) % 9 + 1}00`)
+            }
+            elDiv.setAttribute('id', `ID-${index + 1}`)
+            elDiv.setAttribute('class', `text-green-${index % 9 + 1}00`)
+            elDiv.innerHTML = `<span class="bg-yellow-${(9 - index % 9)}00"> This is ID-${index + 1}</span>`
+            document.getElementById('container').append(elDiv)
+            index++
+            if (index >= 20) clearInterval(timer)
+        }, 2000)
+    </script>
+</body>
+
+</html>
