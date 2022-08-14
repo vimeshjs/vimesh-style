@@ -2,8 +2,8 @@
 (function (G) {
     if (!G.$vs) return console.error('Vimesh style core is not loaded!')
     const E = G.$vs._.each
-    const R = G.$vs.register
-    const GS = G.$vs.generateSizes
+    const R = G.$vs._.register
+    const GS = G.$vs._.generateSizes
     const C = G.$vs.config
     const P = C.prefix
     let i
@@ -230,4 +230,4 @@
     R(`table-auto`, `table-layout: auto;`)
     R(`table-fixed`, `table-layout: fixed;`)
 
-})(window);
+})(typeof window !== 'undefined' && window || global);

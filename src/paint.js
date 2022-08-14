@@ -2,12 +2,12 @@
 (function (G) {
     if (!G.$vs) return console.error('Vimesh style core is not loaded!')
     const E = G.$vs._.each
-    const R = G.$vs.register
-    const GS = G.$vs.generateSizes
-    const GC = G.$vs.generateColors
+    const R = G.$vs._.register
+    const GS = G.$vs._.generateSizes
+    const GC = G.$vs._.generateColors
     const C = G.$vs.config
     const P = C.prefix
-    const { rgbToHex, resolveColor, addInitStyle, _: { isString } } = $vs
+    const { rgbToHex, resolveColor, addInitStyle, isString } = $vs._
     let i
 
     // Font
@@ -244,4 +244,4 @@
     // Screen Readers
     R(`sr-only`, `position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0;`)
     R(`not-sr-only`, `position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; white-space: normal;`)
-})(window);
+})(typeof window !== 'undefined' && window || global);

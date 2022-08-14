@@ -63,7 +63,6 @@
 
     const $vs = G.$vs
     const C = $vs.config
-    const D = document
     function isString(str) {
         return (str != null && typeof str.valueOf() === "string")
     }
@@ -97,49 +96,6 @@
     }
     $vs._ = { isString, isArray, isFunction, each, extend }
 
-    function domChange(target, callback) {
-        if (undefined === callback) {
-            callback = target
-            target = D.body
-        }
-        if (!target) return domReady(() => domChange(D.body, callback))
-        const observer = new MutationObserver(callback)
-        observer.observe(target, { attributes: true, childList: true, subtree: true })
-    }
-    let ready = false
-    let listeners = []
-    if (D.addEventListener) {
-        D.addEventListener('DOMContentLoaded', () => {
-            ready = true;
-            while (listeners[0])
-                listeners.shift()()
-        }, false);
-    }
-    function domReady(callback) {
-        callback && (ready ? callback() : listeners.push(callback))
-    }
-    domReady(() => {
-        styleElement = D.createElement('style')
-        D.head.appendChild(styleElement)
-        updateAutoStyles()
-        if (C.auto) resolveAllKnownClasses()
-    })
-    domChange(() => {
-        if (C.auto) resolveAllKnownClasses()
-    })
-    function resolveAllKnownClasses() {
-        let all = D.querySelectorAll('*[class]')
-        let max = all.length
-        for (let i = 0; i < max; i++) {
-            let cn = all[i].className
-            if (cn) {
-                addClassesToAutoStyles(cn)
-                // SVGAnimatedString
-                if (cn.baseVal) addClassesToAutoStyles(cn.baseVal)
-                if (cn.animVal) addClassesToAutoStyles(cn.animVal)
-            }
-        }
-    }
     let addedClasses = {}
     let classMap = $vs.classMap = {}
     let initMap = {}
@@ -148,8 +104,12 @@
     let initStyles = []
     let customStyles = []
     let styleElement = null
+    let stylesOutput = null
     let generators = $vs.generators = []
 
+    function getStyles() {
+        return stylesOutput
+    }
     function decomposeClassName(className) {
         if (isString(className)) {
             let breakpoint = null
@@ -201,17 +161,13 @@
     }
     function updateAutoStyles() {
         let all = initStyles.concat(autoStyles, customStyles)
-        if (styleElement && all.length > 0) {
-            let styles1 = styleElement.innerHTML
-            let styles2 = (C.preset ? presetStyles : []).concat(all).join('\n')
-            if (styles1 !== styles2)
-                styleElement.innerHTML = styles2
-        }
-    }
-    function addCustomStyle(style) {
-        if (customStyles.indexOf(style) == -1) {
-            customStyles.push(style)
-            updateAutoStyles()
+        if (all.length > 0) {
+            let newStyles = (C.preset ? presetStyles : []).concat(all).join('\n')
+            if (newStyles !== stylesOutput) {
+                stylesOutput = newStyles
+                if (styleElement)
+                    styleElement.innerHTML = stylesOutput
+            }
         }
     }
     function addPresetStyle(style) {
@@ -226,7 +182,7 @@
             updateAutoStyles()
         }
     }
-    function addClassesToAutoStyles(classes) {
+    function addClasses(classes) {
         if (classes) {
             if (isString(classes)) classes = classes.split(' ')
             each(classes, name => {
@@ -258,11 +214,39 @@
             updateAutoStyles()
         }
     }
-    function resetAutoStyles(){
+    function resolveAllKnownClasses(root) {
+        let all = root.querySelectorAll('*[class]')
+        let max = all.length
+        let allClasses = []
+        for (let i = 0; i < max; i++) {
+            let cn = all[i].className
+            if (cn) {
+                allClasses.push(cn)
+                // SVGAnimatedString
+                if (cn.baseVal) allClasses.push(cn.baseVal)
+                if (cn.animVal) allClasses.push(cn.animVal)
+            }
+        }
+        addClasses(allClasses.join(' '))
+    }
+    function resetAutoStyles() {
         addedClasses = {}
         autoStyles = []
+        stylesOutput = null
         if (styleElement)
             styleElement.innerHTML = null
+    }
+    const CLASS_NAMES = /class\s*=\s*['\"](?<class>[^'\"]*)['\"]/g
+    function extractClasses(html) {
+        let match
+        let classes = []
+        while ((match = CLASS_NAMES.exec(html)) !== null) {
+            each(match.groups.class.split(' '), cls => {
+                cls = cls && cls.trim()
+                if (cls && classes.indexOf(cls) === -1) classes.push(cls)
+            })
+        }
+        return classes
     }
     const hueStep = 2;
     const saturationStep = 0.16;
@@ -452,9 +436,7 @@
             if (i <= 3) handler(i + 0.5, `${i * 0.25 + 0.125}rem`)
         }
     }
-    extend($vs, {
-        domReady,
-        domChange,
+    extend($vs._, {
         hexToRgb,
         rgbToHex,
         register,
@@ -464,12 +446,57 @@
         resolveClass,
         addPresetStyle,
         addInitStyle,
-        addCustomStyle,
-        updateAutoStyles,
         resetAutoStyles,
-        resolveAllKnownClasses,
-        addClassesToAutoStyles
+        resolveAllKnownClasses
+    })
+    extend($vs, {
+        getStyles,
+        extractClasses,
+        addClasses
     })
 
-    if (G.vsSetup) G.vsSetup($vs)
-})(window);
+    const D = G.document
+    if (D) {
+        D.dispatchEvent(new CustomEvent('vs:ready', { bubbles: true, composed: true, cancelable: true, }))
+
+        function domChange(target, callback) {
+            if (undefined === callback) {
+                callback = target
+                target = D.body
+            }
+            if (!target) return domReady(() => domChange(D.body, callback))
+            const observer = new MutationObserver(callback)
+            observer.observe(target, { attributes: true, childList: true, subtree: true })
+        }
+        let ready = false
+        let listeners = []
+        if (D && D.addEventListener) {
+            D.addEventListener('DOMContentLoaded', () => {
+                ready = true;
+                while (listeners[0])
+                    listeners.shift()()
+            }, false);
+        }
+        function domReady(callback) {
+            callback && (ready ? callback() : listeners.push(callback))
+        }
+        domReady(() => {
+            const VSC = 'vimesh-styles'
+            styleElement = D.getElementById(VSC)
+            if (!styleElement) {
+                styleElement = D.createElement('style')
+                styleElement.setAttribute('id', VSC)
+                D.head.appendChild(styleElement)
+            }
+            updateAutoStyles()
+            if (C.auto) resolveAllKnownClasses(D.body)
+            if (stylesOutput && stylesOutput !== styleElement.innerHTML)
+                styleElement.innerHTML = stylesOutput
+        })
+        domChange(() => {
+            console.log(arguments)
+            if (C.auto) resolveAllKnownClasses(D.body)
+        })
+    }
+
+})(typeof window !== 'undefined' && window || global);
