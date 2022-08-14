@@ -185,7 +185,7 @@
                 classes = classes.split(' ')
             else {
                 let all = []
-                each(classes, cls => all = all.concat(cls && cls.split(' ') || []))
+                each(classes, cls => all = all.concat(cls && cls.split && cls.split(' ') || []))
                 classes = all
             }
             each(classes, name => {
