@@ -172,18 +172,22 @@
     function addPresetStyle(style) {
         if (presetStyles.indexOf(style) == -1) {
             presetStyles.push(style)
-            updateAutoStyles()
         }
     }
     function addInitStyle(style) {
         if (initStyles.indexOf(style) == -1) {
             initStyles.push(style)
-            updateAutoStyles()
         }
     }
     function addClasses(classes, update = true) {
         if (classes) {
-            if (isString(classes)) classes = classes.split(' ')
+            if (isString(classes))
+                classes = classes.split(' ')
+            else {
+                let all = []
+                each(classes, cls => all = all.concat(cls && cls.split(' ') || []))
+                classes = all
+            }
             each(classes, name => {
                 if (!name || addedClasses[name]) return
                 let style = resolveClass(name)
@@ -213,7 +217,7 @@
             if (update) updateAutoStyles()
         }
     }
-    function resolveAllKnownClasses(root, update) {
+    function resolveAllKnownClasses(root, update = true) {
         let all = [root, ...root.querySelectorAll('*[class]')]
         let allClasses = []
         each(all, el => {
@@ -225,7 +229,7 @@
                 if (cn.animVal) allClasses.push(cn.animVal)
             }
         })
-        addClasses(allClasses.join(' '), update)
+        addClasses(allClasses, update)
     }
     function resetAutoStyles() {
         addedClasses = {}
@@ -486,8 +490,7 @@
                 styleElement.setAttribute('id', VSC)
                 D.head.appendChild(styleElement)
             }
-            updateAutoStyles()
-            if (C.auto) resolveAllKnownClasses(D.body, true)
+            if (C.auto) resolveAllKnownClasses(D.body)
             if (stylesOutput && stylesOutput !== styleElement.innerHTML)
                 styleElement.innerHTML = stylesOutput
         })
@@ -497,8 +500,9 @@
                     if (m.type === 'childList') {
                         m.addedNodes.forEach(node => resolveAllKnownClasses(node, false))
                     } else if (m.type === 'attributes') {
-                        if (m.attributeName === 'class') {
-                            addClasses(m.target.getAttribute('class'), false)
+                        let cn = m.target.className
+                        if (m.attributeName === 'class' && cn) {
+                            addClasses([cn, cn.baseVal, cn.animVal], false)
                         }
                     }
                 })
