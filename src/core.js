@@ -218,6 +218,7 @@
         }
     }
     function resolveAllKnownClasses(root, update = true) {
+        if (!root || !root.querySelectorAll) return
         let all = [root, ...root.querySelectorAll('*[class]')]
         let allClasses = []
         each(all, el => {
