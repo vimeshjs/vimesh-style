@@ -1,14 +1,17 @@
 <html>
+
 <head>
-    <script>
-        document.addEventListener('vs:ready', () => {
-            $vs.config.preset = false
-        })
-    </script>
     <script src="../../src/core.js"></script>
     <script src="../../src/preset.js"></script>
     <script src="../../src/paint.js"></script>
     <script src="../../src/layout.js"></script>
+
+    <script>
+        $vs.ready.then(() => {
+            $vs.config.preset = false
+            $vs.reset()
+        })
+    </script>
 </head>
 
 <body>

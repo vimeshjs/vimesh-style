@@ -88,9 +88,14 @@
         if (length < 1 || target == null) return target
         for (let i = 0; i < length; i++) {
             const source = sources[i]
-            for (const key in source) {
-                target[key] = source[key]
-            }
+            Object.keys(source).forEach((key) => {
+                var desc = Object.getOwnPropertyDescriptor(source, key)
+                if (desc.get || desc.set) {
+                    Object.defineProperty(target, key, desc);
+                } else {
+                    target[key] = source[key]
+                }
+            })
         }
         return target
     }
@@ -106,9 +111,6 @@
     let stylesOutput = null
     let generators = $vs.generators = []
 
-    function getStyles() {
-        return stylesOutput
-    }
     function decomposeClassName(className) {
         if (isString(className)) {
             let breakpoint = null
@@ -217,7 +219,7 @@
             if (update) updateAutoStyles()
         }
     }
-    function resolveAllKnownClasses(root, update = true) {
+    function resolveAll(root, update = true) {
         if (!root || !root.querySelectorAll) return
         let all = [root, ...root.querySelectorAll('*[class]')]
         let allClasses = []
@@ -232,12 +234,14 @@
         })
         addClasses(allClasses, update)
     }
-    function resetAutoStyles() {
+    function resetStyles() {
         addedClasses = {}
         autoStyles = []
         stylesOutput = null
-        if (styleElement)
+        if (styleElement) {
             styleElement.innerHTML = null
+            if (C.auto) resolveAll(G.document.body)
+        }
     }
     const CLASS_NAMES = /class\s*=\s*['\"](?<class>[^'\"]*)['\"]/g
     function extractClasses(html) {
@@ -448,42 +452,34 @@
         generateSizes,
         resolveClass,
         addPresetStyle,
-        addInitStyle,
-        resetAutoStyles,
-        resolveAllKnownClasses
+        addInitStyle
     })
     extend($vs, {
-        getStyles,
-        extractClasses,
-        addClasses
+        get styles() { return stylesOutput },
+        reset: resetStyles,
+        extract: extractClasses,
+        add: addClasses,
+        resolveAll
     })
 
-    const D = G.document
-    if (D) {
-        D.dispatchEvent(new CustomEvent('vs:ready', { bubbles: true, composed: true, cancelable: true, }))
-
-        function domChange(target, callback) {
-            if (undefined === callback) {
-                callback = target
-                target = D.body
+    if (!G.document) {
+        extend($vs, {
+            get ready() { return Promise.resolve() }
+        })
+    } else {
+        const D = G.document
+        extend($vs, {
+            get ready() {
+                return new Promise(resolve => {
+                    if (D.readyState === "complete") {
+                        resolve()
+                    } else {
+                        D.addEventListener("DOMContentLoaded", resolve)
+                    }
+                })
             }
-            if (!target) return domReady(() => domChange(D.body, callback))
-            const observer = new MutationObserver(callback)
-            observer.observe(target, { attributes: true, childList: true, subtree: true })
-        }
-        let ready = false
-        let listeners = []
-        if (D && D.addEventListener) {
-            D.addEventListener('DOMContentLoaded', () => {
-                ready = true;
-                while (listeners[0])
-                    listeners.shift()()
-            }, false);
-        }
-        function domReady(callback) {
-            callback && (ready ? callback() : listeners.push(callback))
-        }
-        domReady(() => {
+        })
+        $vs.ready.then(() => {
             const VSC = 'vimesh-styles'
             styleElement = D.getElementById(VSC)
             if (!styleElement) {
@@ -491,24 +487,23 @@
                 styleElement.setAttribute('id', VSC)
                 D.head.appendChild(styleElement)
             }
-            if (C.auto) resolveAllKnownClasses(D.body)
-            if (stylesOutput && stylesOutput !== styleElement.innerHTML)
-                styleElement.innerHTML = stylesOutput
-        })
-        domChange((mutations) => {
-            if (C.auto) {
-                each(mutations, m => {
-                    if (m.type === 'childList') {
-                        m.addedNodes.forEach(node => resolveAllKnownClasses(node, false))
-                    } else if (m.type === 'attributes') {
-                        let cn = m.target.className
-                        if (m.attributeName === 'class' && cn) {
-                            addClasses([cn, cn.baseVal, cn.animVal], false)
+            if (C.auto) resolveAll(D.body)
+            const observer = new MutationObserver((mutations) => {
+                if (C.auto) {
+                    each(mutations, m => {
+                        if (m.type === 'childList') {
+                            m.addedNodes.forEach(node => resolveAll(node, false))
+                        } else if (m.type === 'attributes') {
+                            let cn = m.target.className
+                            if (m.attributeName === 'class' && cn) {
+                                addClasses([cn, cn.baseVal, cn.animVal], false)
+                            }
                         }
-                    }
-                })
-                updateAutoStyles()
-            }
+                    })
+                    updateAutoStyles()
+                }
+            })
+            observer.observe(D.body, { attributes: true, childList: true, subtree: true })
         })
     }
 })(typeof window !== 'undefined' && window || global);
