@@ -27,7 +27,6 @@
                 indigo: '6366f1',
                 blue: '3b82f6',
                 sky: '0ea5e9',
-                lightBlue: '0ea5e9',
                 cyan: '06b6d4',
                 teal: '14b8a6',
                 emerald: '10b981',
@@ -38,6 +37,9 @@
                 orange: 'f97316',
                 red: 'ef4444',
                 gray: ['#fafafa', '#f4f4f5', '#e4e4e7', '#d4d4d8', '#a1a1aa', '#71717a', '#52525b', '#3f3f46', '#27272a', '#18181b']
+            },
+            aliasColors: {
+                lightBlue: 'sky'
             },
             specialColors: {
                 white: '#ffffff',
@@ -393,6 +395,7 @@
     function resolveColor(name) {
         if (!name) return null
         let cv = null
+        if (C.aliasColors[name]) name = C.aliasColors[name]
         if (C.specialColors[name]) {
             cv = C.specialColors[name]
             if (cv[0] == '#') cv = hexToRgb(cv)
@@ -411,6 +414,7 @@
                     }
                 }
             }
+            if (C.aliasColors[name]) name = C.aliasColors[name]
             let color = C.colors[name]
             if (!color) return null
             let w = depth ? +depth : 500
