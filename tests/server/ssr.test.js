@@ -1,5 +1,6 @@
 const { normalizeCss } = require('./utils')
-require('../../index')
+const setupVimeshStyle = require('../../index')
+const $vs = setupVimeshStyle()
 
 
 test('generate css classes from html', () => {
