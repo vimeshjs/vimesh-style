@@ -1,4 +1,4 @@
-"use strict";
+
 function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
     G.$vs = {
@@ -510,9 +510,4 @@ function setupCore(G) {
             observer.observe(D.body, { attributes: true, childList: true, subtree: true })
         })
     }
-}
-if (typeof module === 'object' && module.exports) {
-    module.exports = setupCore
-} else {
-    setupCore(typeof window !== 'undefined' && window || this)
 }

@@ -1,21 +1,20 @@
 {
   "name": "@vimesh/style",
   "description": "Full-featured tiny javascript library alternative to Tailwind CSS 2.0. Automatically work with any frontend frameworks, including React, Vue, AngularJS ect.",
-  "version": "0.11.9",
+  "version": "0.12.0",
   "repository": "https://github.com/vimeshjs/vimesh-style.git",
   "author": "Jacky ZHANG <xinjie.zhang@gmail.com>",
   "license": "MIT",
   "unpkg": "dist/vs.js",
+  "type": "module",
   "exports": {
-    "import": "./index.mjs",
-    "require": "./index.js"
+    "import": "./dist/vs.mjs",
+    "require": "./dist/vs.cjs"
   },
   "scripts": {
     "clean": "rimraf dist/*",
-    "build": "node scripts/build.js",
-    "build-es5": "node scripts/build.es5.js",
-    "test-browser": "playwright test",
-    "test-server": "jest test"
+    "build": "node scripts/build.cjs",
+    "test": "jest test"
   },
   "devDependencies": {
     "@babel/core": "^7.17.5",

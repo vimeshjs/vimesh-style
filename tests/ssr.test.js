@@ -1,5 +1,5 @@
 const { normalizeCss } = require('./utils')
-const setupVimeshStyle = require('../../index')
+const setupVimeshStyle = require('@vimesh/style')
 const $vs = setupVimeshStyle()
 
 

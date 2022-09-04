@@ -1,5 +1,5 @@
 let config = {
-    rootDir: './tests/server',
+    rootDir: './tests',
 }
 
 module.exports = config

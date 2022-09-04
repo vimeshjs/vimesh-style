@@ -1,4 +1,4 @@
-"use strict";
+
 function setupLayout(G) {
     if (!G.$vs) return console.error('Vimesh style core is not loaded!')
     const E = G.$vs._.each
@@ -230,10 +230,4 @@ function setupLayout(G) {
     R(`table-auto`, `table-layout: auto;`)
     R(`table-fixed`, `table-layout: fixed;`)
 
-}
-
-if (typeof module === 'object' && module.exports) {
-    module.exports = setupLayout
-} else {
-    setupLayout(typeof window !== 'undefined' && window || this)
 }

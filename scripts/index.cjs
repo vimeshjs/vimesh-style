@@ -1,7 +1,3 @@
-const setupCore = require('./src/core')
-const setupPreset = require('./src/preset')
-const setupLayout = require('./src/layout')
-const setupPaint = require('./src/paint')
 
 function setupVimeshStyle() {
     let G = {}
