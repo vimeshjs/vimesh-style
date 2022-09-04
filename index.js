@@ -3,7 +3,7 @@ const setupPreset = require('./src/preset')
 const setupLayout = require('./src/layout')
 const setupPaint = require('./src/paint')
 
-module.exports = function () {
+function setupVimeshStyle() {
     let G = {}
     setupCore(G)
     setupPreset(G)
@@ -11,3 +11,5 @@ module.exports = function () {
     setupPaint(G)
     return G.$vs
 }
+
+module.exports = setupVimeshStyle
