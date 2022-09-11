@@ -167,9 +167,14 @@ function setupCore(G) {
         if (all.length > 0) {
             let newStyles = (C.preset ? presetStyles : []).concat(all).join('\n')
             if (newStyles !== stylesOutput) {
-                stylesOutput = newStyles
-                if (styleElement)
-                    styleElement.innerHTML = stylesOutput
+                if (G.document) {
+                    if (styleElement)
+                        styleElement.innerHTML = stylesOutput = newStyles
+                    else
+                        setTimeout(updateAutoStyles)
+                } else {
+                    stylesOutput = newStyles
+                }
             }
         }
     }
@@ -468,22 +473,20 @@ function setupCore(G) {
 
     if (!G.document) {
         extend($vs, {
-            get ready() { return Promise.resolve() }
+            ready(callback) { callback() }
         })
     } else {
         const D = G.document
         extend($vs, {
-            get ready() {
-                return new Promise(resolve => {
-                    if (D.readyState === "complete") {
-                        resolve()
-                    } else {
-                        D.addEventListener("DOMContentLoaded", resolve)
-                    }
-                })
+            ready(callback) {
+                if (D.readyState === "complete") {
+                    callback()
+                } else {
+                    D.addEventListener("DOMContentLoaded", callback)
+                }
             }
         })
-        $vs.ready.then(() => {
+        $vs.ready(() => {
             const VSC = 'vimesh-styles'
             styleElement = D.getElementById(VSC)
             if (!styleElement) {
