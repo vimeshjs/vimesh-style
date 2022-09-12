@@ -5,6 +5,7 @@ function setupCore(G) {
         config: {
             auto: true,
             prefix: 'vs',
+            attributify: 'all', // all, none, prefix
             preset: true,
             breakpoints: {
                 sm: 640,
@@ -65,6 +66,7 @@ function setupCore(G) {
 
     const $vs = G.$vs
     const C = $vs.config
+
     function isString(str) {
         return (str != null && typeof str.valueOf() === "string")
     }
@@ -73,6 +75,9 @@ function setupCore(G) {
     }
     function isFunction(func) {
         return typeof func === "function";
+    }
+    function isPlainObject(item) {
+        return item !== null && typeof item === 'object' && item.constructor === Object;
     }
     function each(objOrArray, callback) {
         if (isArray(objOrArray)) {
@@ -101,7 +106,7 @@ function setupCore(G) {
         }
         return target
     }
-    $vs._ = { isString, isArray, isFunction, each, extend }
+    $vs._ = { isString, isArray, isFunction, isPlainObject, each, extend }
 
     let addedClasses = {}
     let classMap = $vs.classMap = {}
@@ -112,6 +117,10 @@ function setupCore(G) {
     let styleElement = null
     let stylesOutput = null
     let generators = $vs.generators = []
+    const KNOWN_ATTR_NAMES = 'font,text,underline,list,bg,gradient,border,divide,ring,icon,container,p,m,space,w,min-w,max-w,h,min-h,max-h,flex,grid,table,order,align,justify,place,display,pos,box,caret,isolation,object,overflow,overscroll,z,shadow,opacity,blend,filter,backdrop,transition,animate,transform,appearance,cursor,outline,pointer,resize,select,sr'
+    const cache = {}
+    const knownAttributes = {}
+    each(KNOWN_ATTR_NAMES.split(','), a => knownAttributes[a] = true)
 
     function decomposeClassName(className) {
         if (isString(className)) {
@@ -226,19 +235,77 @@ function setupCore(G) {
             if (update) updateAutoStyles()
         }
     }
-    function resolveAll(root, update = true) {
-        if (!root || !root.querySelectorAll) return
-        let all = [root, ...root.querySelectorAll('*[class]')]
-        let allClasses = []
-        each(all, el => {
-            let cn = el.className
-            if (cn) {
-                allClasses.push(cn)
-                // SVGAnimatedString
-                if (cn.baseVal) allClasses.push(cn.baseVal)
-                if (cn.animVal) allClasses.push(cn.animVal)
+    function recordKnownClasses(el, update = true) {
+        const prefix = C.prefix + ':'
+        let classes = []
+        let classesFromAttrs = []
+        let cn = el.className
+        if (cn) {
+            classes.push(cn)
+            // SVGAnimatedString
+            if (cn.baseVal) classes.push(cn.baseVal)
+            if (cn.animVal) classes.push(cn.animVal)
+        }
+        each(el.attributes, a => {
+            let prop = a.name
+            let group = null
+            if (C.attributify !== 'none' && prop.startsWith(prefix))
+                group = prop.substring(prefix.length)
+            else if (C.attributify === 'all' && knownAttributes[prop])
+                group = prop
+            if (group) {
+                let val = a.value
+                let groupCache = cache[group]
+                if (!groupCache) groupCache = cache[group] = {}
+                each(val.split(/ |,/).filter(Boolean), cls => {
+                    let pos = cls.indexOf('~')
+                    if (pos !== -1) cls = cls.replace('~', group)
+                    if (groupCache[cls]) return classesFromAttrs.push(groupCache[cls])
+                    let r = resolveClass(cls)
+                    if (r) {
+                        classesFromAttrs.push(cls)
+                        groupCache[cls] = cls
+                    } else {
+                        pos = cls.lastIndexOf(':')
+                        let ncls = group + '-' + cls
+                        if (pos !== -1) {
+                            ncls = cls.substring(0, pos + 1) + group + '-' + cls.substring(pos + 1)
+                        }
+                        r = resolveClass(ncls)
+                        if (r) {
+                            groupCache[cls] = ncls
+                            classesFromAttrs.push(ncls)
+                        } else {
+                            ncls = group + cls
+                            if (pos !== -1) {
+                                ncls = cls.substring(0, pos + 1) + group + cls.substring(pos + 1)
+                            }
+                            r = resolveClass(ncls)
+                            if (r) {
+                                groupCache[cls] = ncls
+                                classesFromAttrs.push(ncls)
+                            }
+                        }
+                    }
+                })
             }
         })
+        if (el._vs_undo_add_classes_from_attrs)
+            el._vs_undo_add_classes_from_attrs()
+        if (classesFromAttrs.length > 0) {
+            let classesToAdd = classesFromAttrs.join(' ').split(' ').filter(i => !el.classList.contains(i)).filter(Boolean)
+            el.classList.add(...classesToAdd)
+            el._vs_undo_add_classes_from_attrs = () => {
+                el.classList.remove(...classesToAdd)
+            }
+        }
+        return [...classes, ...classesFromAttrs]
+    }
+    function resolveAll(root, update = true) {
+        if (!root || !root.querySelectorAll) return
+        let all = [root, ...root.querySelectorAll(C.attributify === 'none' ? '*[class]' : '*')]
+        let allClasses = []
+        each(all, el => allClasses.push(...recordKnownClasses(el)))
         addClasses(allClasses, update)
     }
     function resetStyles() {
@@ -247,7 +314,7 @@ function setupCore(G) {
         stylesOutput = null
         if (styleElement) {
             styleElement.innerHTML = null
-            if (C.auto) resolveAll(G.document.body)
+            if (C.auto && G.document) resolveAll(G.document.body)
         }
     }
     const CLASS_NAMES = /class\s*=\s*['\"](?<class>[^'\"]*)['\"]/g
@@ -497,20 +564,19 @@ function setupCore(G) {
             if (C.auto) resolveAll(D.body)
             const observer = new MutationObserver((mutations) => {
                 if (C.auto) {
+                    observer.disconnect()
                     each(mutations, m => {
                         if (m.type === 'childList') {
                             m.addedNodes.forEach(node => resolveAll(node, false))
                         } else if (m.type === 'attributes') {
-                            let cn = m.target.className
-                            if (m.attributeName === 'class' && cn) {
-                                addClasses([cn, cn.baseVal, cn.animVal], false)
-                            }
+                            addClasses(recordKnownClasses(m.target), false)
                         }
                     })
                     updateAutoStyles()
+                    observer.observe(D, { attributes: true, childList: true, subtree: true })
                 }
             })
-            observer.observe(D.body, { attributes: true, childList: true, subtree: true })
+            observer.observe(D, { attributes: true, childList: true, subtree: true })
         })
     }
 }
