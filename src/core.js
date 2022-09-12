@@ -108,6 +108,7 @@ function setupCore(G) {
     }
     $vs._ = { isString, isArray, isFunction, isPlainObject, each, extend }
 
+    const KNOWN_ATTR_NAMES = 'font,text,underline,list,bg,gradient,border,divide,ring,icon,container,p,m,space,w,min-w,max-w,h,min-h,max-h,flex,grid,table,order,align,justify,place,display,pos,box,caret,isolation,object,overflow,overscroll,z,shadow,opacity,blend,filter,backdrop,transition,animate,transform,appearance,cursor,outline,pointer,resize,select,sr'
     let addedClasses = {}
     let classMap = $vs.classMap = {}
     let initMap = {}
@@ -117,9 +118,8 @@ function setupCore(G) {
     let styleElement = null
     let stylesOutput = null
     let generators = $vs.generators = []
-    const KNOWN_ATTR_NAMES = 'font,text,underline,list,bg,gradient,border,divide,ring,icon,container,p,m,space,w,min-w,max-w,h,min-h,max-h,flex,grid,table,order,align,justify,place,display,pos,box,caret,isolation,object,overflow,overscroll,z,shadow,opacity,blend,filter,backdrop,transition,animate,transform,appearance,cursor,outline,pointer,resize,select,sr'
-    const cache = {}
-    const knownAttributes = {}
+    let cache = {}
+    let knownAttributes = {}
     each(KNOWN_ATTR_NAMES.split(','), a => knownAttributes[a] = true)
 
     function decomposeClassName(className) {
@@ -260,7 +260,10 @@ function setupCore(G) {
                 each(val.split(/ |,/).filter(Boolean), cls => {
                     let pos = cls.indexOf('~')
                     if (pos !== -1) cls = cls.replace('~', group)
-                    if (groupCache[cls]) return classesFromAttrs.push(groupCache[cls])
+                    if (groupCache[cls]) {
+                        if ('-' !== groupCache[cls]) classesFromAttrs.push(groupCache[cls])
+                        return
+                    }
                     let r = resolveClass(cls)
                     if (r) {
                         classesFromAttrs.push(cls)
@@ -284,6 +287,8 @@ function setupCore(G) {
                             if (r) {
                                 groupCache[cls] = ncls
                                 classesFromAttrs.push(ncls)
+                            } else {
+                                groupCache[cls] = '-'
                             }
                         }
                     }
@@ -312,6 +317,7 @@ function setupCore(G) {
         addedClasses = {}
         autoStyles = []
         stylesOutput = null
+        cache = {}
         if (styleElement) {
             styleElement.innerHTML = null
             if (C.auto && G.document) resolveAll(G.document.body)
