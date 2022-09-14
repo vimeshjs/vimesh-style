@@ -12,26 +12,37 @@ if (!fs.existsSync(dirDist)) fs.mkdirSync(dirDist)
 let files = ['core.js', 'preset.js', 'layout.js', 'paint.js']
 
 let code = _.map(files, f => fs.readFileSync(`${dirSrc}/${f}`)).join('')
-
+const processors = {
+    '.dev': js => js,
+    '': js => UglifyJS.minify(js).code
+}
 function buildBrowserEs5() {
     let code = _.map(files, f => babel.transformSync(fs.readFileSync(`${dirSrc}/${f}`), { presets: ['@babel/preset-env'] }).code).join('')
-    let result = `// Vimesh Style (ES5) v${version}\r\n` + UglifyJS.minify(code + fs.readFileSync(`${__dirname}/index.js`)).code
-    fs.writeFileSync(`${dirDist}/vs.es5.js`, result)
+    _.each(processors, (func, type) => {
+        let result = `// Vimesh Style (ES5) v${version}\r\n` + func(code + fs.readFileSync(`${__dirname}/index.js`))
+        fs.writeFileSync(`${dirDist}/vs${type}.es5.js`, result)
+    })
 }
 
 function buildBrowser() {
-    let result = `// Vimesh Style v${version}\r\n` + UglifyJS.minify(code + fs.readFileSync(`${__dirname}/index.js`)).code
-    fs.writeFileSync(`${dirDist}/vs.js`, result)
+    _.each(processors, (func, type) => {
+        let result = `// Vimesh Style v${version}\r\n` + func(code + fs.readFileSync(`${__dirname}/index.js`))
+        fs.writeFileSync(`${dirDist}/vs${type}.js`, result)
+    })
 }
 
 function buildCommonJS() {
-    let result = `// Vimesh Style v${version}\r\n` + UglifyJS.minify(code + fs.readFileSync(`${__dirname}/index.cjs`)).code
-    fs.writeFileSync(`${dirDist}/vs.cjs`, result)
+    _.each(processors, (func, type) => {
+        let result = `// Vimesh Style v${version}\r\n` + func(code + fs.readFileSync(`${__dirname}/index.cjs`))
+        fs.writeFileSync(`${dirDist}/vs${type}.cjs`, result)
+    })
 }
 
 function buildESM() {
-    let result = `// Vimesh Style v${version}\r\n` + UglifyJS.minify(code + fs.readFileSync(`${__dirname}/index.mjs`)).code
-    fs.writeFileSync(`${dirDist}/vs.mjs`, result)
+    _.each(processors, (func, type) => {
+        let result = `// Vimesh Style v${version}\r\n` + func(code + fs.readFileSync(`${__dirname}/index.mjs`))
+        fs.writeFileSync(`${dirDist}/vs${type}.mjs`, result)
+    })
 }
 
 buildBrowser()
