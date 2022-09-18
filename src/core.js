@@ -6,7 +6,6 @@ function setupCore(G) {
             auto: true,
             prefix: 'vs',
             attributify: 'all', // all, none, prefix
-            preset: true,
             breakpoints: {
                 sm: 640,
                 md: 768,
@@ -80,6 +79,7 @@ function setupCore(G) {
         return item !== null && typeof item === 'object' && item.constructor === Object;
     }
     function each(objOrArray, callback) {
+        if (!objOrArray) return
         if (isArray(objOrArray)) {
             objOrArray.forEach((val, index) => {
                 callback(val, index, index)
@@ -112,7 +112,6 @@ function setupCore(G) {
     let addedClasses = {}
     let classMap = $vs.classMap = {}
     let initMap = {}
-    let presetStyles = []
     let autoStyles = []
     let initStyles = []
     let styleElement = null
@@ -174,7 +173,7 @@ function setupCore(G) {
     function updateAutoStyles() {
         let all = initStyles.concat(autoStyles)
         if (all.length > 0) {
-            let newStyles = (C.preset ? presetStyles : []).concat(all).join('\n')
+            let newStyles = (C.preset ? [C.preset] : []).concat(all).join('\n')
             if (newStyles !== stylesOutput) {
                 if (G.document) {
                     if (styleElement)
@@ -185,11 +184,6 @@ function setupCore(G) {
                     stylesOutput = newStyles
                 }
             }
-        }
-    }
-    function addPresetStyle(style) {
-        if (presetStyles.indexOf(style) == -1) {
-            presetStyles.push(style)
         }
     }
     function addInitStyle(style) {
@@ -533,7 +527,6 @@ function setupCore(G) {
         generateColors,
         generateSizes,
         resolveClass,
-        addPresetStyle,
         addInitStyle
     })
     extend($vs, {
