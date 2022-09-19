@@ -1,6 +1,5 @@
 
-function setupVimeshStyle() {
-    let G = {}
+function setupVimeshStyle(G = {}) {
     setupCore(G)
     setupPreset(G)
     setupLayout(G)
