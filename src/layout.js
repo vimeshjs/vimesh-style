@@ -25,14 +25,26 @@ function setupLayout(G) {
     ], v => R(v, `display: ${'hidden' === v ? 'none' : v};`))
 
     // Flex 
-    R(`flex-grow-0`, `flex-grow: 0;`)
-    R(`flex-grow`, `flex-grow: 1;`)
-    R(`flex-shrink-0`, `flex-shrink: 0;`)
-    R(`flex-shrink`, `flex-shrink: 1;`)
+    E(['', 'flex-'], p => {
+        R(`${p}grow-0`, `flex-grow: 0;`)
+        R(`${p}grow`, `flex-grow: 1;`)
+        R(`${p}shrink-0`, `flex-shrink: 0;`)
+        R(`${p}shrink`, `flex-shrink: 1;`)
+    })
     E({ '1': '1 1 0%', auto: "1 1 auto", initial: "0 1 auto", none: 'none' }, (v, k) => R(`flex-${k}`, `flex: ${v};`))
     E(['row', 'row-reverse', 'col', 'col-reverse'], v => R(`flex-${v}`, `flex-direction: ${v.replace('col', 'column')};`))
     E(['wrap', 'wrap-reverse', 'nowrap'], v => R(`flex-${v}`, `flex-wrap: ${v};`))
 
+
+    E({ auto: 'auto', full: '100%' }, (v, k) => R(`basis-${k}`, `flex-basis: ${v};`))
+    E([2, 3, 4, 5, 6, 12], max => {
+        for (i = 1; i < max; i++) {
+            R(`basis-${i}/${max}`, `flex-basis: ${+(i * 100 / max).toFixed(6)}%;`)
+        }
+    })
+    GS((name, value) => {
+        R(`basis-${name}`, `flex-basis: ${value};`)
+    })
     // Clear
     E(['left', 'right', 'both', 'none'], v => R(`clear-${v}`, `clear: ${v};`))
 
@@ -40,8 +52,8 @@ function setupLayout(G) {
     E(['static', 'fixed', 'absolute', 'relative', 'sticky'], v => R(v, `position: ${v};`))
 
     // Width & Height
-    E({ auto: 'auto', full: '100%', screen: '100vw', min: 'min-content', max: 'max-content' }, (v, k) => R(`w-${k}`, `width: ${v};`))
-    E({ auto: 'auto', full: '100%', screen: '100vh' }, (v, k) => R(`h-${k}`, `height: ${v};`))
+    E({ auto: 'auto', full: '100%', screen: '100vw', min: 'min-content', max: 'max-content', fit: 'fit-content' }, (v, k) => R(`w-${k}`, `width: ${v};`))
+    E({ auto: 'auto', full: '100%', screen: '100vh', min: 'min-content', max: 'max-content', fit: 'fit-content' }, (v, k) => R(`h-${k}`, `height: ${v};`))
     E([2, 3, 4, 5, 6, 12], max => {
         for (i = 1; i < max; i++) {
             R(`w-${i}/${max}`, `width: ${+(i * 100 / max).toFixed(6)}%;`)
@@ -54,7 +66,7 @@ function setupLayout(G) {
     })
 
     // Min & Max Width
-    const ws = { '0': '0px', full: '100%', min: 'min-content', max: 'max-content' }
+    const ws = { '0': '0px', full: '100%', min: 'min-content', max: 'max-content', fit: 'fit-content' }
     E(ws, (v, k) => R(`min-w-${k}`, `min-width: ${v};`))
     ws.none = 'none'
     ws.prose = '65ch'
@@ -64,7 +76,7 @@ function setupLayout(G) {
     E(ws, (v, k) => R(`max-w-${k}`, `max-width: ${v};`))
 
     // Min & Max Height
-    E({ '0': '0px', full: '100%', screen: '100vh' }, (v, k) => {
+    E({ '0': '0px', full: '100%', screen: '100vh', min: 'min-content', max: 'max-content', fit: 'fit-content' }, (v, k) => {
         R(`min-h-${k}`, `min-height: ${v};`)
         R(`max-h-${k}`, `max-height: ${v};`)
     })

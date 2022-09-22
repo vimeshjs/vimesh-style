@@ -1,4 +1,4 @@
-const { normalizeCss, waitForTimeout, sleep } = require('./utils')
+const { normalizeCss, sleep } = require('./utils')
 
 test('auto generate styles from known classes', async () => {
     const expectedCssOutput = normalizeCss(`

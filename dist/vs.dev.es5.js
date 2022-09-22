@@ -1,4 +1,4 @@
-// Vimesh Style (ES5) v0.13.5
+// Vimesh Style (ES5) v0.13.7
 "use strict";
 
 function _wrapRegExp() { _wrapRegExp = function _wrapRegExp(re, groups) { return new BabelRegExp(re, void 0, groups); }; var _super = RegExp.prototype, _groups = new WeakMap(); function BabelRegExp(re, flags, groups) { var _this = new RegExp(re, flags); return _groups.set(_this, groups || _groups.get(re)), _setPrototypeOf(_this, BabelRegExp.prototype); } function buildGroups(result, re) { var g = _groups.get(re); return Object.keys(g).reduce(function (groups, name) { return groups[name] = result[g[name]], groups; }, Object.create(null)); } return _inherits(BabelRegExp, RegExp), BabelRegExp.prototype.exec = function (str) { var result = _super.exec.call(this, str); return result && (result.groups = buildGroups(result, this)), result; }, BabelRegExp.prototype[Symbol.replace] = function (str, substitution) { if ("string" == typeof substitution) { var groups = _groups.get(this); return _super[Symbol.replace].call(this, str, substitution.replace(/\$<([^>]+)>/g, function (_, name) { return "$" + groups[name]; })); } if ("function" == typeof substitution) { var _this = this; return _super[Symbol.replace].call(this, str, function () { var args = arguments; return "object" != _typeof(args[args.length - 1]) && (args = [].slice.call(args)).push(buildGroups(args, _this)), substitution.apply(this, args); }); } return _super[Symbol.replace].call(this, str, substitution); }, _wrapRegExp.apply(this, arguments); }
@@ -34,6 +34,7 @@ function setupCore(G) {
 
   G.$vs = {
     config: {
+      debug: false,
       auto: true,
       prefix: 'vs',
       attributify: 'all',
@@ -168,7 +169,7 @@ function setupCore(G) {
   var addedClasses = {};
   var classMap = $vs.classMap = {};
   var initMap = {};
-  var autoStyles = [];
+  var autoStyles = {};
   var initStyles = [];
   var styleElement = null;
   var stylesOutput = null;
@@ -238,11 +239,18 @@ function setupCore(G) {
       }
     }
 
+    if (!style && C.debug) console.log("Unknown class: ".concat(className));
     return style;
   }
 
   function updateAutoStyles() {
-    var all = initStyles.concat(autoStyles);
+    var keys = Object.keys(autoStyles).sort(function (a, b) {
+      return (C.breakpoints[a] || 0) - (C.breakpoints[b] || 0);
+    });
+    var all = initStyles;
+    each(keys, function (k) {
+      return all = all.concat(autoStyles[k]);
+    });
 
     if (all.length > 0) {
       var newStyles = (C.preset ? [C.preset] : []).concat(all).join('\n');
@@ -303,7 +311,9 @@ function setupCore(G) {
           }
 
           addedClasses[name] = true;
-          autoStyles.push(style);
+          var bpStyles = autoStyles[classDetails.breakpoint || ''];
+          if (!bpStyles) bpStyles = autoStyles[classDetails.breakpoint || ''] = [];
+          bpStyles.push(style);
         }
       });
       if (update) updateAutoStyles();
@@ -414,7 +424,7 @@ function setupCore(G) {
 
   function resetStyles() {
     addedClasses = {};
-    autoStyles = [];
+    autoStyles = {};
     stylesOutput = null;
     cache = {};
 
@@ -827,10 +837,12 @@ function setupLayout(G) {
     return R(v, "display: ".concat('hidden' === v ? 'none' : v, ";"));
   }); // Flex 
 
-  R("flex-grow-0", "flex-grow: 0;");
-  R("flex-grow", "flex-grow: 1;");
-  R("flex-shrink-0", "flex-shrink: 0;");
-  R("flex-shrink", "flex-shrink: 1;");
+  E(['', 'flex-'], function (p) {
+    R("".concat(p, "grow-0"), "flex-grow: 0;");
+    R("".concat(p, "grow"), "flex-grow: 1;");
+    R("".concat(p, "shrink-0"), "flex-shrink: 0;");
+    R("".concat(p, "shrink"), "flex-shrink: 1;");
+  });
   E({
     '1': '1 1 0%',
     auto: "1 1 auto",
@@ -844,6 +856,20 @@ function setupLayout(G) {
   });
   E(['wrap', 'wrap-reverse', 'nowrap'], function (v) {
     return R("flex-".concat(v), "flex-wrap: ".concat(v, ";"));
+  });
+  E({
+    auto: 'auto',
+    full: '100%'
+  }, function (v, k) {
+    return R("basis-".concat(k), "flex-basis: ".concat(v, ";"));
+  });
+  E([2, 3, 4, 5, 6, 12], function (max) {
+    for (i = 1; i < max; i++) {
+      R("basis-".concat(i, "/").concat(max), "flex-basis: ".concat(+(i * 100 / max).toFixed(6), "%;"));
+    }
+  });
+  GS(function (name, value) {
+    R("basis-".concat(name), "flex-basis: ".concat(value, ";"));
   }); // Clear
 
   E(['left', 'right', 'both', 'none'], function (v) {
@@ -859,14 +885,18 @@ function setupLayout(G) {
     full: '100%',
     screen: '100vw',
     min: 'min-content',
-    max: 'max-content'
+    max: 'max-content',
+    fit: 'fit-content'
   }, function (v, k) {
     return R("w-".concat(k), "width: ".concat(v, ";"));
   });
   E({
     auto: 'auto',
     full: '100%',
-    screen: '100vh'
+    screen: '100vh',
+    min: 'min-content',
+    max: 'max-content',
+    fit: 'fit-content'
   }, function (v, k) {
     return R("h-".concat(k), "height: ".concat(v, ";"));
   });
@@ -885,7 +915,8 @@ function setupLayout(G) {
     '0': '0px',
     full: '100%',
     min: 'min-content',
-    max: 'max-content'
+    max: 'max-content',
+    fit: 'fit-content'
   };
   E(ws, function (v, k) {
     return R("min-w-".concat(k), "min-width: ".concat(v, ";"));
@@ -910,7 +941,10 @@ function setupLayout(G) {
   E({
     '0': '0px',
     full: '100%',
-    screen: '100vh'
+    screen: '100vh',
+    min: 'min-content',
+    max: 'max-content',
+    fit: 'fit-content'
   }, function (v, k) {
     R("min-h-".concat(k), "min-height: ".concat(v, ";"));
     R("max-h-".concat(k), "max-height: ".concat(v, ";"));

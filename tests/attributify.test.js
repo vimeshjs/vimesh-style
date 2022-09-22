@@ -1,4 +1,4 @@
-const { normalizeCss, waitForTimeout, sleep } = require('./utils')
+const { normalizeCss, sleep } = require('./utils')
 
 test('resolve attributify values into styles', async () => {
     require('../dist/vs')

@@ -1,6 +1,5 @@
-const fs = require('fs')
-const { normalizeCss, waitForTimeout, sleep } = require('./utils')
-const { waitFor, screen } = require('@testing-library/dom')
+const { sleep } = require('./utils')
+const { screen } = require('@testing-library/dom')
 
 test('resolve dynamic generated classes', async () => {
     require('../dist/vs')

@@ -3,6 +3,7 @@ function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
     G.$vs = {
         config: {
+            debug: false,
             auto: true,
             prefix: 'vs',
             attributify: 'all', // all, none, prefix
@@ -112,7 +113,7 @@ function setupCore(G) {
     let addedClasses = {}
     let classMap = $vs.classMap = {}
     let initMap = {}
-    let autoStyles = []
+    let autoStyles = {}
     let initStyles = []
     let styleElement = null
     let stylesOutput = null
@@ -168,10 +169,13 @@ function setupCore(G) {
                 if (style && gi.init) gi.init(classDetails)
             }
         }
+        if (!style && C.debug) console.log(`Unknown class: ${className}`)
         return style
     }
     function updateAutoStyles() {
-        let all = initStyles.concat(autoStyles)
+        let keys = Object.keys(autoStyles).sort((a, b) => (C.breakpoints[a] || 0) - (C.breakpoints[b] || 0))
+        let all = initStyles
+        each(keys, k => all = all.concat(autoStyles[k]))
         if (all.length > 0) {
             let newStyles = (C.preset ? [C.preset] : []).concat(all).join('\n')
             if (newStyles !== stylesOutput) {
@@ -223,7 +227,9 @@ function setupCore(G) {
                         style = `.${fullname} ${style} `
                     }
                     addedClasses[name] = true
-                    autoStyles.push(style)
+                    let bpStyles = autoStyles[classDetails.breakpoint || '']
+                    if (!bpStyles) bpStyles = autoStyles[classDetails.breakpoint || ''] = []
+                    bpStyles.push(style)
                 }
             })
             if (update) updateAutoStyles()
@@ -309,7 +315,7 @@ function setupCore(G) {
     }
     function resetStyles() {
         addedClasses = {}
-        autoStyles = []
+        autoStyles = {}
         stylesOutput = null
         cache = {}
         if (styleElement) {
