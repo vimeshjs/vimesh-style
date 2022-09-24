@@ -1,4 +1,4 @@
-// Vimesh Style (ES5) v0.13.7
+// Vimesh Style (ES5) v0.13.8
 "use strict";
 
 function _wrapRegExp() { _wrapRegExp = function _wrapRegExp(re, groups) { return new BabelRegExp(re, void 0, groups); }; var _super = RegExp.prototype, _groups = new WeakMap(); function BabelRegExp(re, flags, groups) { var _this = new RegExp(re, flags); return _groups.set(_this, groups || _groups.get(re)), _setPrototypeOf(_this, BabelRegExp.prototype); } function buildGroups(result, re) { var g = _groups.get(re); return Object.keys(g).reduce(function (groups, name) { return groups[name] = result[g[name]], groups; }, Object.create(null)); } return _inherits(BabelRegExp, RegExp), BabelRegExp.prototype.exec = function (str) { var result = _super.exec.call(this, str); return result && (result.groups = buildGroups(result, this)), result; }, BabelRegExp.prototype[Symbol.replace] = function (str, substitution) { if ("string" == typeof substitution) { var groups = _groups.get(this); return _super[Symbol.replace].call(this, str, substitution.replace(/\$<([^>]+)>/g, function (_, name) { return "$" + groups[name]; })); } if ("function" == typeof substitution) { var _this = this; return _super[Symbol.replace].call(this, str, function () { var args = arguments; return "object" != _typeof(args[args.length - 1]) && (args = [].slice.call(args)).push(buildGroups(args, _this)), substitution.apply(this, args); }); } return _super[Symbol.replace].call(this, str, substitution); }, _wrapRegExp.apply(this, arguments); }
@@ -52,24 +52,28 @@ function setupCore(G) {
         mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
       },
       colors: {
-        rose: 'f43f5e',
-        pink: 'ec4899',
-        fuchsia: 'd946ef',
-        purple: 'a855f7',
-        violet: '8b5cf6',
-        indigo: '6366f1',
-        blue: '3b82f6',
-        sky: '0ea5e9',
-        cyan: '06b6d4',
-        teal: '14b8a6',
-        emerald: '10b981',
-        green: '22c55e',
-        lime: '84cc16',
-        yellow: 'eab308',
-        amber: 'f59e0b',
-        orange: 'f97316',
-        red: 'ef4444',
-        gray: ['#fafafa', '#f4f4f5', '#e4e4e7', '#d4d4d8', '#a1a1aa', '#71717a', '#52525b', '#3f3f46', '#27272a', '#18181b']
+        slate: ["#f8fafc", "#f1f5f9", "#e2e8f0", "#cbd5e1", "#94a3b8", "#64748b", "#475569", "#334155", "#1e293b", "#0f172a"],
+        gray: ["#f9fafb", "#f3f4f6", "#e5e7eb", "#d1d5db", "#9ca3af", "#6b7280", "#4b5563", "#374151", "#1f2937", "#111827"],
+        zinc: ["#fafafa", "#f4f4f5", "#e4e4e7", "#d4d4d8", "#a1a1aa", "#71717a", "#52525b", "#3f3f46", "#27272a", "#18181b"],
+        neutral: ["#fafafa", "#f5f5f5", "#e5e5e5", "#d4d4d4", "#a3a3a3", "#737373", "#525252", "#404040", "#262626", "#171717"],
+        stone: ["#fafaf9", "#f5f5f4", "#e7e5e4", "#d6d3d1", "#a8a29e", "#78716c", "#57534e", "#44403c", "#292524", "#1c1917"],
+        red: ["#fef2f2", "#fee2e2", "#fecaca", "#fca5a5", "#f87171", "#ef4444", "#dc2626", "#b91c1c", "#991b1b", "#7f1d1d"],
+        orange: ["#fff7ed", "#ffedd5", "#fed7aa", "#fdba74", "#fb923c", "#f97316", "#ea580c", "#c2410c", "#9a3412", "#7c2d12"],
+        amber: ["#fffbeb", "#fef3c7", "#fde68a", "#fcd34d", "#fbbf24", "#f59e0b", "#d97706", "#b45309", "#92400e", "#78350f"],
+        yellow: ["#fefce8", "#fef9c3", "#fef08a", "#fde047", "#facc15", "#eab308", "#ca8a04", "#a16207", "#854d0e", "#713f12"],
+        lime: ["#f7fee7", "#ecfccb", "#d9f99d", "#bef264", "#a3e635", "#84cc16", "#65a30d", "#4d7c0f", "#3f6212", "#365314"],
+        green: ["#f0fdf4", "#dcfce7", "#bbf7d0", "#86efac", "#4ade80", "#22c55e", "#16a34a", "#15803d", "#166534", "#14532d"],
+        emerald: ["#ecfdf5", "#d1fae5", "#a7f3d0", "#6ee7b7", "#34d399", "#10b981", "#059669", "#047857", "#065f46", "#064e3b"],
+        teal: ["#f0fdfa", "#ccfbf1", "#99f6e4", "#5eead4", "#2dd4bf", "#14b8a6", "#0d9488", "#0f766e", "#115e59", "#134e4a"],
+        cyan: ["#ecfeff", "#cffafe", "#a5f3fc", "#67e8f9", "#22d3ee", "#06b6d4", "#0891b2", "#0e7490", "#155e75", "#164e63"],
+        sky: ["#f0f9ff", "#e0f2fe", "#bae6fd", "#7dd3fc", "#38bdf8", "#0ea5e9", "#0284c7", "#0369a1", "#075985", "#0c4a6e"],
+        blue: ["#eff6ff", "#dbeafe", "#bfdbfe", "#93c5fd", "#60a5fa", "#3b82f6", "#2563eb", "#1d4ed8", "#1e40af", "#1e3a8a"],
+        indigo: ["#eef2ff", "#e0e7ff", "#c7d2fe", "#a5b4fc", "#818cf8", "#6366f1", "#4f46e5", "#4338ca", "#3730a3", "#312e81"],
+        violet: ["#f5f3ff", "#ede9fe", "#ddd6fe", "#c4b5fd", "#a78bfa", "#8b5cf6", "#7c3aed", "#6d28d9", "#5b21b6", "#4c1d95"],
+        purple: ["#faf5ff", "#f3e8ff", "#e9d5ff", "#d8b4fe", "#c084fc", "#a855f7", "#9333ea", "#7e22ce", "#6b21a8", "#581c87"],
+        fuchsia: ["#fdf4ff", "#fae8ff", "#f5d0fe", "#f0abfc", "#e879f9", "#d946ef", "#c026d3", "#a21caf", "#86198f", "#701a75"],
+        pink: ["#fdf2f8", "#fce7f3", "#fbcfe8", "#f9a8d4", "#f472b6", "#ec4899", "#db2777", "#be185d", "#9d174d", "#831843"],
+        rose: ["#fff1f2", "#ffe4e6", "#fecdd3", "#fda4af", "#fb7185", "#f43f5e", "#e11d48", "#be123c", "#9f1239", "#881337"]
       },
       aliasColors: {
         lightBlue: 'sky'
@@ -205,7 +209,7 @@ function setupCore(G) {
   }
 
   function normalizeCssName(name) {
-    return name.replace(/:/g, '\\:').replace(/\//g, '\\/').replace(/\./g, '\\.');
+    return name.replace(/:/g, '\\:').replace(/\//g, '\\/').replace(/\./g, '\\.').replace(/\[/g, '\\[').replace(/\]/g, '\\]').replace(/\#/g, '\\#').replace(/\%/g, '\\%');
   }
 
   function register(keys, generatorOrStyle, initFunc) {
@@ -452,162 +456,6 @@ function setupCore(G) {
     return classes;
   }
 
-  var hueStep = 2;
-  var saturationStep = 0.16;
-  var saturationStep2 = 0.05;
-  var brightnessStep1 = 0.05;
-  var brightnessStep2 = 0.15;
-  var lightColorCount = 5;
-  var darkColorCount = 4;
-
-  function getHue(hsv, i, isLight) {
-    var hue;
-
-    if (hsv.h >= 60 && hsv.h <= 240) {
-      hue = isLight ? hsv.h - hueStep * i : hsv.h + hueStep * i;
-    } else {
-      hue = isLight ? hsv.h + hueStep * i : hsv.h - hueStep * i;
-    }
-
-    if (hue < 0) {
-      hue += 360;
-    } else if (hue >= 360) {
-      hue -= 360;
-    }
-
-    return Math.round(hue);
-  }
-
-  function getSaturation(hsv, i, isLight) {
-    var saturation;
-
-    if (isLight) {
-      saturation = hsv.s - saturationStep * i;
-    } else if (i === darkColorCount) {
-      saturation = hsv.s + saturationStep;
-    } else {
-      saturation = hsv.s + saturationStep2 * i;
-    }
-
-    if (saturation > 1) {
-      saturation = 1;
-    }
-
-    if (isLight && i === lightColorCount && saturation > 0.1) {
-      saturation = 0.1;
-    }
-
-    if (saturation < 0.06) {
-      saturation = 0.06;
-    }
-
-    return Number(saturation.toFixed(2));
-  }
-
-  function getValue(hsv, i, isLight) {
-    var value;
-
-    if (isLight) {
-      value = hsv.v + brightnessStep1 * i;
-    } else {
-      value = hsv.v - brightnessStep2 * i;
-    }
-
-    if (value > 1) {
-      value = 1;
-    }
-
-    if (value < 0) {
-      value = 0;
-    }
-
-    return Number(value.toFixed(2));
-  }
-
-  function rgbToHsv(rgb) {
-    var r = rgb.r,
-        g = rgb.g,
-        b = rgb.b;
-    r /= 255, g /= 255, b /= 255;
-    var max = Math.max(r, g, b),
-        min = Math.min(r, g, b);
-    var h,
-        s,
-        v = max;
-    var d = max - min;
-    s = max == 0 ? 0 : d / max;
-
-    if (max == min) {
-      h = 0; // achromatic
-    } else {
-      switch (max) {
-        case r:
-          h = (g - b) / d + (g < b ? 6 : 0);
-          break;
-
-        case g:
-          h = (b - r) / d + 2;
-          break;
-
-        case b:
-          h = (r - g) / d + 4;
-          break;
-      }
-
-      h /= 6;
-    }
-
-    return {
-      h: h,
-      s: s,
-      v: v
-    };
-  }
-
-  function hsvToRgb(hsv) {
-    var h = hsv.h,
-        s = hsv.s,
-        v = hsv.v;
-    var r, g, b;
-    var i = Math.floor(h * 6);
-    var f = h * 6 - i;
-    var p = v * (1 - s);
-    var q = v * (1 - f * s);
-    var t = v * (1 - (1 - f) * s);
-
-    switch (i % 6) {
-      case 0:
-        r = v, g = t, b = p;
-        break;
-
-      case 1:
-        r = q, g = v, b = p;
-        break;
-
-      case 2:
-        r = p, g = v, b = t;
-        break;
-
-      case 3:
-        r = p, g = q, b = v;
-        break;
-
-      case 4:
-        r = t, g = p, b = v;
-        break;
-
-      case 5:
-        r = v, g = p, b = q;
-        break;
-    }
-
-    return {
-      r: r * 255,
-      g: g * 255,
-      b: b * 255
-    };
-  }
-
   function hexToRgb(hex) {
     var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
 
@@ -632,36 +480,36 @@ function setupCore(G) {
     return ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
   }
 
-  function colorPalette(color, index) {
-    if (index === 6) return color;
-    var isLight = index <= 6;
-    var rgb = hexToRgb(color);
-    var hsv = rgbToHsv(rgb);
-    var i = isLight ? lightColorCount + 1 - index : index - lightColorCount - 1;
-    hsv = {
-      h: hsv.h * 360,
-      s: hsv.s,
-      v: hsv.v
-    };
-    hsv = {
-      h: getHue(hsv, i, isLight) / 360,
-      s: getSaturation(hsv, i, isLight),
-      v: getValue(hsv, i, isLight)
-    };
-    rgb = hsvToRgb(hsv);
-    return rgbToHex(rgb);
-  }
-
   function resolveColor(name) {
     if (!name) return null;
+    name = name.trim();
+
+    if (name.startsWith('[') && name.endsWith(']')) {
+      name = name.substring(1, name.length - 1);
+      return name;
+    }
+
     var cv = null;
+    var pos = name.lastIndexOf('/');
+    var alpha = null;
+
+    if (pos !== -1) {
+      var alphaDef = name.substring(pos + 1).trim();
+      name = name.substring(0, pos);
+
+      if (alphaDef.startsWith('[') && alphaDef.endsWith(']')) {
+        alpha = +alphaDef.substring(1, alphaDef.length - 1);
+      } else {
+        alpha = +alphaDef / 100;
+      }
+    }
+
     if (C.aliasColors[name]) name = C.aliasColors[name];
 
     if (C.specialColors[name]) {
       cv = C.specialColors[name];
-      if (cv[0] == '#') cv = hexToRgb(cv);
     } else {
-      var pos = name.lastIndexOf('-');
+      pos = name.lastIndexOf('-');
       var depth = null;
 
       if (pos != -1) {
@@ -683,13 +531,17 @@ function setupCore(G) {
       if (!color) return null;
       var w = depth ? +depth : 500;
       var index = 50 === w ? 1 : w / 100 + 1;
-      if (isArray(color)) return color[index - 1];
-      var hex = colorPalette(color, index);
-      cv = hexToRgb(hex);
+      cv = color[index - 1];
+    }
+
+    if (cv && cv[0] === '#' && alpha !== null) {
+      cv = hexToRgb(cv);
+      cv.a = alpha;
     }
 
     return cv;
-  }
+  } //function generate
+
 
   function generateColors(classNamePrefix, styleName, nameAffix) {
     var vn = "--".concat(C.prefix, "-").concat(classNamePrefix, "-opacity");
@@ -702,9 +554,10 @@ function setupCore(G) {
       } : style;
     });
     register("".concat(classNamePrefix, "-"), function (classDetails) {
-      var cv = resolveColor(classDetails.name.substring(classNamePrefix.length + 1));
+      var color = classDetails.name.substring(classNamePrefix.length + 1);
+      var cv = resolveColor(color);
       if (!cv) return null;
-      var style = isString(cv) ? "".concat(styleName, ": ").concat(cv, ";") : "".concat(vn, ":1;").concat(styleName, ": rgba(").concat(cv.r, ",").concat(cv.g, ",").concat(cv.b, ",var(").concat(vn, "));");
+      var style = isString(cv) ? "".concat(styleName, ": ").concat(cv, ";") : "".concat(undefined === cv.a ? "".concat(vn, ":1;") : '').concat(styleName, ": rgba(").concat(cv.r, ",").concat(cv.g, ",").concat(cv.b, ",").concat(undefined === cv.a ? "var(".concat(vn, ")") : cv.a, ");");
       return nameAffix ? {
         name: "$".concat(nameAffix),
         style: style
@@ -719,6 +572,14 @@ function setupCore(G) {
       if (1 == i) handler('px', '1px');
       if (i <= 3) handler(i + 0.5, "".concat(i * 0.25 + 0.125, "rem"));
     }
+
+    each([2, 3, 4, 5, 6, 12], function (max) {
+      for (var _i2 = 1; _i2 < max; _i2++) {
+        var name = "".concat(_i2, "/").concat(max);
+        var value = "".concat(+(_i2 * 100 / max).toFixed(6), "%");
+        handler(name, value);
+      }
+    });
   }
 
   extend($vs._, {
@@ -863,11 +724,6 @@ function setupLayout(G) {
   }, function (v, k) {
     return R("basis-".concat(k), "flex-basis: ".concat(v, ";"));
   });
-  E([2, 3, 4, 5, 6, 12], function (max) {
-    for (i = 1; i < max; i++) {
-      R("basis-".concat(i, "/").concat(max), "flex-basis: ".concat(+(i * 100 / max).toFixed(6), "%;"));
-    }
-  });
   GS(function (name, value) {
     R("basis-".concat(name), "flex-basis: ".concat(value, ";"));
   }); // Clear
@@ -899,12 +755,6 @@ function setupLayout(G) {
     fit: 'fit-content'
   }, function (v, k) {
     return R("h-".concat(k), "height: ".concat(v, ";"));
-  });
-  E([2, 3, 4, 5, 6, 12], function (max) {
-    for (i = 1; i < max; i++) {
-      R("w-".concat(i, "/").concat(max), "width: ".concat(+(i * 100 / max).toFixed(6), "%;"));
-      R("h-".concat(i, "/").concat(max), "height: ".concat(+(i * 100 / max).toFixed(6), "%;"));
-    }
   });
   GS(function (name, value) {
     R("w-".concat(name), "width: ".concat(value, ";"));
@@ -1066,8 +916,8 @@ function setupLayout(G) {
     R("grid-rows-".concat(i), "grid-template-rows: repeat(".concat(i, ", minmax(0, 1fr));"));
   }
 
-  E(['row', 'col', 'row-dense', 'col-dense'], function (v) {
-    return R("grid-flow-".concat(v), "grid-auto-flow: ".concat(v, ";"));
+  E(['row', 'col', 'dense', 'row-dense', 'col-dense'], function (v) {
+    return R("grid-flow-".concat(v), "grid-auto-flow: ".concat(v.replace('col', 'column'), ";"));
   });
   E({
     auto: 'auto',
@@ -1337,6 +1187,8 @@ function setupPaint(G) {
     xl: 0.75,
     '2xl': 1,
     '3xl': 1.5,
+    '4xl': 2,
+    '5xl': 2.5,
     full: '9999px'
   }, function (s, n) {
     s = isString(s) ? s : s + 'rem';
@@ -1410,17 +1262,17 @@ function setupPaint(G) {
 
   var bs = "box-shadow: var(--".concat(P, "-ring-offset-shadow, 0 0 #0000), var(--").concat(P, "-ring-shadow, 0 0 #0000), var(--").concat(P, "-shadow);");
   E({
-    sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-    _: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-    md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-    lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-    xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-    '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-    inner: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
+    sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+    _: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+    md: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+    lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+    xl: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+    '2xl': '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+    inner: 'inset 0 2px 4px 0 rgb(0 0 0 / 0.05)',
     none: '0 0 #0000'
   }, function (v, k) {
-    return R("shadow".concat(k == '_' ? '' : "-".concat(k)), "--".concat(P, "-shadow: ").concat(v, ";").concat(bs));
-  }, initShadow);
+    return R("shadow".concat(k == '_' ? '' : "-".concat(k)), "--".concat(P, "-shadow: ").concat(v, ";").concat(bs), initRing);
+  });
   R("opacity-", function (classDetails) {
     var parts = classDetails.name.split('-');
     return "opacity: ".concat(+parts[1] / 100, ";");
@@ -1471,19 +1323,36 @@ function setupPaint(G) {
     if (C.keyframes[k]) addInitStyle("@keyframes ".concat(k).concat(C.keyframes[k]));
   }); // Transform
 
-  var tvs = "--".concat(P, "-translate-x: 0; --").concat(P, "-translate-y: 0; --").concat(P, "-rotate: 0; --").concat(P, "-skew-x: 0; --").concat(P, "-skew-y: 0; --").concat(P, "-scale-x: 1; --").concat(P, "-scale-y: 1;");
-  var ts = "rotate(var(--".concat(P, "-rotate)) skewX(var(--").concat(P, "-skew-x)) skewY(var(--").concat(P, "-skew-y)) scaleX(var(--").concat(P, "-scale-x)) scaleY(var(--").concat(P, "-scale-y));");
-  R("transform", "".concat(tvs, "transform: translateX(var(--").concat(P, "-translate-x)) translateY(var(--").concat(P, "-translate-y)) ").concat(ts));
-  R("transform-gpu", "".concat(tvs, "translate3d(var(--").concat(P, "-translate-x), var(--").concat(P, "-translate-y), 0) ").concat(ts));
+  var initTransform = function initTransform() {
+    return addInitStyle("*, ::before, ::after {--".concat(P, "-translate-x: 0; --").concat(P, "-translate-y: 0; --").concat(P, "-rotate: 0; --").concat(P, "-skew-x: 0; --").concat(P, "-skew-y: 0; --").concat(P, "-scale-x: 1; --").concat(P, "-scale-y: 1;}"));
+  };
+
+  var transform = "transform: translateX(var(--".concat(P, "-translate-x)) translateY(var(--").concat(P, "-translate-y)) rotate(var(--").concat(P, "-rotate)) skewX(var(--").concat(P, "-skew-x)) skewY(var(--").concat(P, "-skew-y)) scaleX(var(--").concat(P, "-scale-x)) scaleY(var(--").concat(P, "-scale-y))");
   R("transform-none", "transform: none;");
   E(['center', 'top', 'top-right', 'right', 'bottom-right', 'bottom', 'bottom-left', 'left', 'top-left'], function (v) {
     return R("origin-".concat(v), "transform-origin: ".concat(v.replace('-', ' '), ";"));
   });
-  R('scale-', function (classDetails) {
-    var parts = classDetails.name.split('-');
-    var v = +parts[parts.length - 1] / 100;
-    if (parts.length == 2) return "--".concat(P, "-scale-x: ").concat(v, ";--").concat(P, "-scale-y: ").concat(v, ";");else return "--".concat(P, "-scale-").concat(parts[1], ": ").concat(v, ";");
-  });
+  R(['scale-', '-scale-'], function (classDetails) {
+    var cn = classDetails.name;
+    var s = '';
+
+    if ('-' == cn[0]) {
+      cn = cn.substring(1);
+      s = '-';
+    }
+
+    var pos = cn.lastIndexOf('-');
+    var name = cn.substring(0, pos);
+    var value = cn.substring(pos + 1);
+
+    if (value.startsWith('[') && value.endsWith(']')) {
+      value = value.substring(1, value.length - 1);
+    } else {
+      value = +value / 100;
+    }
+
+    if (name === 'scale') return "".concat(transform, "; --").concat(P, "-scale-x: ").concat(s).concat(value, ";--").concat(P, "-scale-y: ").concat(s).concat(value, ";");else return "".concat(transform, "; --").concat(P, "-").concat(name, ": ").concat(s).concat(value, ";");
+  }, initTransform);
   R(['rotate-', '-rotate-'], function (classDetails) {
     var cn = classDetails.name;
     var s = '';
@@ -1493,39 +1362,63 @@ function setupPaint(G) {
       s = '-';
     }
 
-    var parts = cn.split('-');
-    return "--".concat(P, "-rotate: ").concat(s).concat(parts[1], "deg;");
-  });
+    var value = cn.substring(cn.lastIndexOf('-') + 1);
+
+    if (value.startsWith('[') && value.endsWith(']')) {
+      value = value.substring(1, value.length - 1);
+    } else {
+      value = "".concat(value, "deg");
+    }
+
+    return "".concat(transform, "; --").concat(P, "-rotate: ").concat(s).concat(value, ";");
+  }, initTransform);
 
   function genTrans(name, value) {
     E(['x', 'y'], function (a) {
       return E(['', '-'], function (s) {
-        R("".concat(s, "translate-").concat(a, "-").concat(name), "--".concat(P, "-translate-").concat(a, ": ").concat(s).concat(value, ";"));
+        R("".concat(s, "translate-").concat(a, "-").concat(name), "".concat(transform, "; --").concat(P, "-translate-").concat(a, ": ").concat(s).concat(value, ";"), initTransform);
       });
     });
   }
 
   GS(genTrans);
-  E([2, 3, 4], function (max) {
-    for (i = 1; i < max; i++) {
-      genTrans("".concat(i, "/").concat(max), "".concat(+(i * 100 / max).toFixed(6), "%;"));
-    }
-  });
   genTrans('full', '100%');
-  E([0, 1, 2, 3, 6, 12], function (d) {
-    return E(['x', 'y'], function (a) {
-      return E(['', '-'], function (s) {
-        R("".concat(s, "skew-").concat(a, "-").concat(d), "--".concat(P, "-skew-").concat(a, ": ").concat(s).concat(d, "deg;"));
-      });
+  E(['x', 'y'], function (a) {
+    return E(['', '-'], function (s) {
+      var prefix = "".concat(s, "translate-").concat(a, "-[");
+      R(prefix, function (classDetails) {
+        var value = classDetails.name.substring(prefix.length, classDetails.name.length - 1);
+        return "".concat(transform, "; --").concat(P, "-translate-").concat(a, ": ").concat(s).concat(value, ";");
+      }, initTransform);
     });
-  }); // Interactivity 
+  });
+  E(['x', 'y'], function (a) {
+    return E(['', '-'], function (s) {
+      var prefix = "".concat(s, "skew-").concat(a, "-[");
+      E([0, 1, 2, 3, 6, 12], function (d) {
+        return R("".concat(s, "skew-").concat(a, "-").concat(d), "".concat(transform, "; --").concat(P, "-skew-").concat(a, ": ").concat(s).concat(d, "deg;"), initTransform);
+      });
+      R(prefix, function (classDetails) {
+        var value = classDetails.name.substring(prefix.length, classDetails.name.length - 1);
+        return "".concat(transform, "; --").concat(P, "-skew-").concat(a, ": ").concat(s).concat(value, ";");
+      }, initTransform);
+    });
+  }); // Outline 
+
+  R("outline-none", "outline: 2px solid transparent; outline-offset: 2px;");
+  R("outline", "outline-style: solid;");
+  E(['dashed', 'dotted', 'double', 'hidden'], function (v) {
+    return R("outline-".concat(v), "outline-style: ".concat(v, ";"));
+  });
+  E([0, 1, 2, 4, 8], function (v) {
+    R("outline-".concat(v), "outline-width: ".concat(v, "px;"));
+    R("outline-offset-".concat(v), "outline-offset: ".concat(v, "px;"));
+  });
+  GC('outline', "outline-color"); // Interactivity 
 
   R("appearance-none", "appearance: none;");
   E(['auto', 'default', 'pointer', 'wait', 'text', 'move', 'help', 'not-allowed'], function (v) {
     return R("cursor-".concat(v), "cursor: ".concat(v, ";"));
-  });
-  E(['none', 'white', 'black'], function (v) {
-    return R("outline-".concat(v), "outline: 2px ".concat(v == 'none' ? 'solid transparent' : "dotted ".concat(v), "; outline-offset: 2px;"));
   });
   E(['none', 'auto'], function (v) {
     return R("pointer-events-".concat(v), "pointer-events: ".concat(v, ";"));

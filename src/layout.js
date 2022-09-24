@@ -155,7 +155,7 @@ function setupLayout(G) {
     R(`grid-rows-none`, `grid-template-rows: none;`)
     for (i = 1; i <= 6; i++) R(`grid-rows-${i}`, `grid-template-rows: repeat(${i}, minmax(0, 1fr));`)
 
-    E(['row', 'col', 'row-dense', 'col-dense'], v => R(`grid-flow-${v}`, `grid-auto-flow: ${v};`))
+    E(['row', 'col', 'dense', 'row-dense', 'col-dense'], v => R(`grid-flow-${v}`, `grid-auto-flow: ${v.replace('col', 'column')};`))
     E({ auto: 'auto', min: 'min-content', max: 'max-content', fr: 'minmax(0, 1fr)' }, (v, k) => {
         R(`auto-cols-${k}`, `grid-auto-columns: ${v};`)
         R(`auto-rows-${k}`, `grid-auto-rows: ${v};`)
