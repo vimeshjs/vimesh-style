@@ -145,15 +145,15 @@ function setupPaint(G) {
     // Effects
     const bs = `box-shadow: var(--${P}-ring-offset-shadow, 0 0 #0000), var(--${P}-ring-shadow, 0 0 #0000), var(--${P}-shadow);`
     E({
-        sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-        _: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-        md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-        lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-        xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-        '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        inner: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
+        sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        _: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+        md: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+        lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+        xl: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+        '2xl': '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+        inner: 'inset 0 2px 4px 0 rgb(0 0 0 / 0.05)',
         none: '0 0 #0000'
-    }, (v, k) => R(`shadow${k == '_' ? '' : `-${k}`}`, `--${P}-shadow: ${v};${bs}`), initShadow)
+    }, (v, k) => R(`shadow${k == '_' ? '' : `-${k}`}`, `--${P}-shadow: ${v};${bs}`, initRing))
 
     R(`opacity-`, classDetails => {
         let parts = classDetails.name.split('-')
@@ -193,20 +193,30 @@ function setupPaint(G) {
     })
 
     // Transform
-    const tvs = `--${P}-translate-x: 0; --${P}-translate-y: 0; --${P}-rotate: 0; --${P}-skew-x: 0; --${P}-skew-y: 0; --${P}-scale-x: 1; --${P}-scale-y: 1;`
-    const ts = `rotate(var(--${P}-rotate)) skewX(var(--${P}-skew-x)) skewY(var(--${P}-skew-y)) scaleX(var(--${P}-scale-x)) scaleY(var(--${P}-scale-y));`
-    R(`transform`, `${tvs}transform: translateX(var(--${P}-translate-x)) translateY(var(--${P}-translate-y)) ${ts}`)
-    R(`transform-gpu`, `${tvs}translate3d(var(--${P}-translate-x), var(--${P}-translate-y), 0) ${ts}`)
+    const initTransform = () => addInitStyle(`*, ::before, ::after {--${P}-translate-x: 0; --${P}-translate-y: 0; --${P}-rotate: 0; --${P}-skew-x: 0; --${P}-skew-y: 0; --${P}-scale-x: 1; --${P}-scale-y: 1;}`)
+    const transform = `transform: translateX(var(--${P}-translate-x)) translateY(var(--${P}-translate-y)) rotate(var(--${P}-rotate)) skewX(var(--${P}-skew-x)) skewY(var(--${P}-skew-y)) scaleX(var(--${P}-scale-x)) scaleY(var(--${P}-scale-y))`
     R(`transform-none`, `transform: none;`)
     E(['center', 'top', 'top-right', 'right', 'bottom-right', 'bottom', 'bottom-left', 'left', 'top-left'], v => R(`origin-${v}`, `transform-origin: ${v.replace('-', ' ')};`))
-    R('scale-', classDetails => {
-        let parts = classDetails.name.split('-')
-        let v = +parts[parts.length - 1] / 100
-        if (parts.length == 2)
-            return `--${P}-scale-x: ${v};--${P}-scale-y: ${v};`
+    R(['scale-', '-scale-'], classDetails => {
+        let cn = classDetails.name
+        let s = ''
+        if ('-' == cn[0]) {
+            cn = cn.substring(1)
+            s = '-'
+        }
+        let pos = cn.lastIndexOf('-')
+        let name = cn.substring(0, pos)
+        let value = cn.substring(pos + 1)
+        if (value.startsWith('[') && value.endsWith(']')) {
+            value = value.substring(1, value.length - 1)
+        } else {
+            value = +value / 100
+        }
+        if (name === 'scale')
+            return `${transform}; --${P}-scale-x: ${s}${value};--${P}-scale-y: ${s}${value};`
         else
-            return `--${P}-scale-${parts[1]}: ${v};`
-    })
+            return `${transform}; --${P}-${name}: ${s}${value};`
+    }, initTransform)
     R(['rotate-', '-rotate-'], classDetails => {
         let cn = classDetails.name
         let s = ''
@@ -214,29 +224,51 @@ function setupPaint(G) {
             cn = cn.substring(1)
             s = '-'
         }
-        let parts = cn.split('-')
-        return `--${P}-rotate: ${s}${parts[1]}deg;`
-    })
+        let value = cn.substring(cn.lastIndexOf('-') + 1)
+        if (value.startsWith('[') && value.endsWith(']')) {
+            value = value.substring(1, value.length - 1)
+        } else {
+            value = `${value}deg`
+        }
+        return `${transform}; --${P}-rotate: ${s}${value};`
+    }, initTransform)
     function genTrans(name, value) {
         E(['x', 'y'], a => E(['', '-'], (s) => {
-            R(`${s}translate-${a}-${name}`, `--${P}-translate-${a}: ${s}${value};`)
+            R(`${s}translate-${a}-${name}`, `${transform}; --${P}-translate-${a}: ${s}${value};`, initTransform)
         }))
     }
     GS(genTrans)
-    E([2, 3, 4], max => {
-        for (i = 1; i < max; i++) {
-            genTrans(`${i}/${max}`, `${+(i * 100 / max).toFixed(6)}%;`)
-        }
-    })
     genTrans('full', '100%')
-    E([0, 1, 2, 3, 6, 12], d => E(['x', 'y'], a => E(['', '-'], (s) => {
-        R(`${s}skew-${a}-${d}`, `--${P}-skew-${a}: ${s}${d}deg;`)
-    })))
+    E(['x', 'y'], a => E(['', '-'], (s) => {
+        const prefix = `${s}translate-${a}-[`
+        R(prefix, (classDetails) => {
+            let value = classDetails.name.substring(prefix.length, classDetails.name.length - 1)
+            return `${transform}; --${P}-translate-${a}: ${s}${value};`
+        }, initTransform)
+    }))
+    E(['x', 'y'], a => E(['', '-'], (s) => {
+        const prefix = `${s}skew-${a}-[`
+        E([0, 1, 2, 3, 6, 12], d => R(`${s}skew-${a}-${d}`, `${transform}; --${P}-skew-${a}: ${s}${d}deg;`, initTransform))
+        R(prefix, (classDetails) => {
+            let value = classDetails.name.substring(prefix.length, classDetails.name.length - 1)
+            return `${transform}; --${P}-skew-${a}: ${s}${value};`
+        }, initTransform)
+    }))
+
+    // Outline 
+    R(`outline-none`, `outline: 2px solid transparent; outline-offset: 2px;`)
+    R(`outline`, `outline-style: solid;`)
+    E(['dashed', 'dotted', 'double', 'hidden'], v => R(`outline-${v}`, `outline-style: ${v};`))
+    E([0, 1, 2, 4, 8], v => {
+        R(`outline-${v}`, `outline-width: ${v}px;`)
+        R(`outline-offset-${v}`, `outline-offset: ${v}px;`)
+    })
+    GC('outline', `outline-color`)
+
 
     // Interactivity 
     R(`appearance-none`, `appearance: none;`)
     E(['auto', 'default', 'pointer', 'wait', 'text', 'move', 'help', 'not-allowed'], v => R(`cursor-${v}`, `cursor: ${v};`))
-    E(['none', 'white', 'black'], v => R(`outline-${v}`, `outline: 2px ${v == 'none' ? 'solid transparent' : `dotted ${v}`}; outline-offset: 2px;`))
     E(['none', 'auto'], v => R(`pointer-events-${v}`, `pointer-events: ${v};`))
     E({ none: 'none', y: 'vertical', x: 'horizontal', _: 'both' }, (v, k) => R(`resize${k == '_' ? '' : `-${k}`}`, `resize: ${v};`))
     E(['none', 'text', 'all', 'auto'], v => R(`select-${v}`, `user-select: ${v};`))

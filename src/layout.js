@@ -37,11 +37,6 @@ function setupLayout(G) {
 
 
     E({ auto: 'auto', full: '100%' }, (v, k) => R(`basis-${k}`, `flex-basis: ${v};`))
-    E([2, 3, 4, 5, 6, 12], max => {
-        for (i = 1; i < max; i++) {
-            R(`basis-${i}/${max}`, `flex-basis: ${+(i * 100 / max).toFixed(6)}%;`)
-        }
-    })
     GS((name, value) => {
         R(`basis-${name}`, `flex-basis: ${value};`)
     })
@@ -54,12 +49,6 @@ function setupLayout(G) {
     // Width & Height
     E({ auto: 'auto', full: '100%', screen: '100vw', min: 'min-content', max: 'max-content', fit: 'fit-content' }, (v, k) => R(`w-${k}`, `width: ${v};`))
     E({ auto: 'auto', full: '100%', screen: '100vh', min: 'min-content', max: 'max-content', fit: 'fit-content' }, (v, k) => R(`h-${k}`, `height: ${v};`))
-    E([2, 3, 4, 5, 6, 12], max => {
-        for (i = 1; i < max; i++) {
-            R(`w-${i}/${max}`, `width: ${+(i * 100 / max).toFixed(6)}%;`)
-            R(`h-${i}/${max}`, `height: ${+(i * 100 / max).toFixed(6)}%;`)
-        }
-    })
     GS((name, value) => {
         R(`w-${name}`, `width: ${value};`)
         R(`h-${name}`, `height: ${value};`)

@@ -147,7 +147,8 @@ function setupCore(G) {
         }
     }
     function normalizeCssName(name) {
-        return name.replace(/:/g, '\\:').replace(/\//g, '\\/').replace(/\./g, '\\.').replace(/\[/g, '\\[').replace(/\]/g, '\\]').replace(/\#/g, '\\#')
+        return name.replace(/:/g, '\\:').replace(/\//g, '\\/').replace(/\./g, '\\.')
+            .replace(/\[/g, '\\[').replace(/\]/g, '\\]').replace(/\#/g, '\\#').replace(/\%/g, '\\%')
     }
     function register(keys, generatorOrStyle, initFunc) {
         if (!generatorOrStyle) return
@@ -356,7 +357,7 @@ function setupCore(G) {
     function resolveColor(name) {
         if (!name) return null
         name = name.trim()
-        if (name.startsWith('[') && name.endsWith(']')){
+        if (name.startsWith('[') && name.endsWith(']')) {
             name = name.substring(1, name.length - 1)
             return name
         }
@@ -426,6 +427,13 @@ function setupCore(G) {
             if (1 == i) handler('px', '1px')
             if (i <= 3) handler(i + 0.5, `${i * 0.25 + 0.125}rem`)
         }
+        each([2, 3, 4, 5, 6, 12], max => {
+            for (let i = 1; i < max; i++) {
+                let name = `${i}/${max}`
+                let value = `${+(i * 100 / max).toFixed(6)}%`
+                handler(name, value)
+            }
+        })
     }
     extend($vs._, {
         hexToRgb,
