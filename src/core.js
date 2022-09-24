@@ -154,7 +154,7 @@ function setupCore(G) {
         if (!generatorOrStyle) return
         if (!isArray(keys)) keys = [keys]
         if (isFunction(generatorOrStyle))
-            each(keys, key => generators.push({ prefix: key, generator: generatorOrStyle, init: initFunc }))
+            each(keys, key => generators.unshift({ prefix: key, generator: generatorOrStyle, init: initFunc }))
         else
             each(keys, key => {
                 classMap[key] = generatorOrStyle;
@@ -357,50 +357,49 @@ function setupCore(G) {
     function resolveColor(name) {
         if (!name) return null
         name = name.trim()
-        if (name.startsWith('[') && name.endsWith(']')) {
-            name = name.substring(1, name.length - 1)
-            return name
-        }
-        let cv = null
-        let pos = name.lastIndexOf('/')
         let alpha = null
+        let pos = name.lastIndexOf('/')
         if (pos !== -1) {
             let alphaDef = name.substring(pos + 1).trim()
             name = name.substring(0, pos)
-            if (alphaDef.startsWith('[') && alphaDef.endsWith(']')) {
-                alpha = +alphaDef.substring(1, alphaDef.length - 1)
+            let av = extractArbitraryValue(alphaDef)
+            if (av) {
+                alpha = +av
             } else {
                 alpha = +alphaDef / 100
             }
         }
-        if (C.aliasColors[name]) name = C.aliasColors[name]
-        if (C.specialColors[name]) {
-            cv = C.specialColors[name]
-        } else {
-            pos = name.lastIndexOf('-')
-            let depth = null
-            if (pos != -1) {
-                depth = name.substring(pos + 1)
-                name = name.substring(0, pos)
-                let parts = name.split('-')
-                if (parts.length > 1) {
-                    name = parts[0]
-                    for (let i = 1; i < parts.length; i++) {
-                        if (parts[i].length > 0)
-                            name += parts[i][0].toUpperCase() + parts[i].substring(1)
+        let cv = extractArbitraryValue(name)
+        if (!cv) {
+            if (C.aliasColors[name]) name = C.aliasColors[name]
+            if (C.specialColors[name]) {
+                cv = C.specialColors[name]
+            } else {
+                pos = name.lastIndexOf('-')
+                let depth = null
+                if (pos != -1) {
+                    depth = name.substring(pos + 1)
+                    name = name.substring(0, pos)
+                    let parts = name.split('-')
+                    if (parts.length > 1) {
+                        name = parts[0]
+                        for (let i = 1; i < parts.length; i++) {
+                            if (parts[i].length > 0)
+                                name += parts[i][0].toUpperCase() + parts[i].substring(1)
+                        }
                     }
                 }
+                if (C.aliasColors[name]) name = C.aliasColors[name]
+                let color = C.colors[name]
+                if (!color) return null
+                let w = depth ? +depth : 500
+                let index = 50 === w ? 1 : (w / 100) + 1
+                cv = color[index - 1]
             }
-            if (C.aliasColors[name]) name = C.aliasColors[name]
-            let color = C.colors[name]
-            if (!color) return null
-            let w = depth ? +depth : 500
-            let index = 50 === w ? 1 : (w / 100) + 1
-            cv = color[index - 1]
         }
-        if (cv && cv[0] === '#' && alpha !== null) {
+        if (cv && cv[0] === '#') {
             cv = hexToRgb(cv)
-            cv.a = alpha
+            if (alpha !== null) cv.a = alpha
         }
         return cv
     }
@@ -435,22 +434,31 @@ function setupCore(G) {
             }
         })
     }
+    function extractArbitraryValue(name) {
+        if (!name) return null
+        let p1 = name.indexOf('[')
+        let p2 = name.indexOf(']')
+        if (p1 >= 0 && p2 > p1)
+            return name.substring(p1 + 1, p2)
+        return null
+    }
     extend($vs._, {
         hexToRgb,
         rgbToHex,
-        register,
         resolveColor,
         generateColors,
         generateSizes,
         resolveClass,
-        addInitStyle
+        addInitStyle,
+        extractArbitraryValue
     })
     extend($vs, {
         get styles() { return stylesOutput },
         reset: resetStyles,
         extract: extractClasses,
         add: addClasses,
-        resolveAll
+        resolveAll,
+        register
     })
 
     if (!G.document) {

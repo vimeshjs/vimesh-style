@@ -1,4 +1,4 @@
-// Vimesh Style (ES5) v0.13.8
+// Vimesh Style (ES5) v0.13.9
 "use strict";
 
 function _wrapRegExp() { _wrapRegExp = function _wrapRegExp(re, groups) { return new BabelRegExp(re, void 0, groups); }; var _super = RegExp.prototype, _groups = new WeakMap(); function BabelRegExp(re, flags, groups) { var _this = new RegExp(re, flags); return _groups.set(_this, groups || _groups.get(re)), _setPrototypeOf(_this, BabelRegExp.prototype); } function buildGroups(result, re) { var g = _groups.get(re); return Object.keys(g).reduce(function (groups, name) { return groups[name] = result[g[name]], groups; }, Object.create(null)); } return _inherits(BabelRegExp, RegExp), BabelRegExp.prototype.exec = function (str) { var result = _super.exec.call(this, str); return result && (result.groups = buildGroups(result, this)), result; }, BabelRegExp.prototype[Symbol.replace] = function (str, substitution) { if ("string" == typeof substitution) { var groups = _groups.get(this); return _super[Symbol.replace].call(this, str, substitution.replace(/\$<([^>]+)>/g, function (_, name) { return "$" + groups[name]; })); } if ("function" == typeof substitution) { var _this = this; return _super[Symbol.replace].call(this, str, function () { var args = arguments; return "object" != _typeof(args[args.length - 1]) && (args = [].slice.call(args)).push(buildGroups(args, _this)), substitution.apply(this, args); }); } return _super[Symbol.replace].call(this, str, substitution); }, _wrapRegExp.apply(this, arguments); }
@@ -216,7 +216,7 @@ function setupCore(G) {
     if (!generatorOrStyle) return;
     if (!isArray(keys)) keys = [keys];
     if (isFunction(generatorOrStyle)) each(keys, function (key) {
-      return generators.push({
+      return generators.unshift({
         prefix: key,
         generator: generatorOrStyle,
         init: initFunc
@@ -483,60 +483,58 @@ function setupCore(G) {
   function resolveColor(name) {
     if (!name) return null;
     name = name.trim();
-
-    if (name.startsWith('[') && name.endsWith(']')) {
-      name = name.substring(1, name.length - 1);
-      return name;
-    }
-
-    var cv = null;
-    var pos = name.lastIndexOf('/');
     var alpha = null;
+    var pos = name.lastIndexOf('/');
 
     if (pos !== -1) {
       var alphaDef = name.substring(pos + 1).trim();
       name = name.substring(0, pos);
+      var av = extractArbitraryValue(alphaDef);
 
-      if (alphaDef.startsWith('[') && alphaDef.endsWith(']')) {
-        alpha = +alphaDef.substring(1, alphaDef.length - 1);
+      if (av) {
+        alpha = +av;
       } else {
         alpha = +alphaDef / 100;
       }
     }
 
-    if (C.aliasColors[name]) name = C.aliasColors[name];
+    var cv = extractArbitraryValue(name);
 
-    if (C.specialColors[name]) {
-      cv = C.specialColors[name];
-    } else {
-      pos = name.lastIndexOf('-');
-      var depth = null;
+    if (!cv) {
+      if (C.aliasColors[name]) name = C.aliasColors[name];
 
-      if (pos != -1) {
-        depth = name.substring(pos + 1);
-        name = name.substring(0, pos);
-        var parts = name.split('-');
+      if (C.specialColors[name]) {
+        cv = C.specialColors[name];
+      } else {
+        pos = name.lastIndexOf('-');
+        var depth = null;
 
-        if (parts.length > 1) {
-          name = parts[0];
+        if (pos != -1) {
+          depth = name.substring(pos + 1);
+          name = name.substring(0, pos);
+          var parts = name.split('-');
 
-          for (var i = 1; i < parts.length; i++) {
-            if (parts[i].length > 0) name += parts[i][0].toUpperCase() + parts[i].substring(1);
+          if (parts.length > 1) {
+            name = parts[0];
+
+            for (var i = 1; i < parts.length; i++) {
+              if (parts[i].length > 0) name += parts[i][0].toUpperCase() + parts[i].substring(1);
+            }
           }
         }
-      }
 
-      if (C.aliasColors[name]) name = C.aliasColors[name];
-      var color = C.colors[name];
-      if (!color) return null;
-      var w = depth ? +depth : 500;
-      var index = 50 === w ? 1 : w / 100 + 1;
-      cv = color[index - 1];
+        if (C.aliasColors[name]) name = C.aliasColors[name];
+        var color = C.colors[name];
+        if (!color) return null;
+        var w = depth ? +depth : 500;
+        var index = 50 === w ? 1 : w / 100 + 1;
+        cv = color[index - 1];
+      }
     }
 
-    if (cv && cv[0] === '#' && alpha !== null) {
+    if (cv && cv[0] === '#') {
       cv = hexToRgb(cv);
-      cv.a = alpha;
+      if (alpha !== null) cv.a = alpha;
     }
 
     return cv;
@@ -582,15 +580,23 @@ function setupCore(G) {
     });
   }
 
+  function extractArbitraryValue(name) {
+    if (!name) return null;
+    var p1 = name.indexOf('[');
+    var p2 = name.indexOf(']');
+    if (p1 >= 0 && p2 > p1) return name.substring(p1 + 1, p2);
+    return null;
+  }
+
   extend($vs._, {
     hexToRgb: hexToRgb,
     rgbToHex: rgbToHex,
-    register: register,
     resolveColor: resolveColor,
     generateColors: generateColors,
     generateSizes: generateSizes,
     resolveClass: resolveClass,
-    addInitStyle: addInitStyle
+    addInitStyle: addInitStyle,
+    extractArbitraryValue: extractArbitraryValue
   });
   extend($vs, {
     get styles() {
@@ -600,7 +606,8 @@ function setupCore(G) {
     reset: resetStyles,
     extract: extractClasses,
     add: addClasses,
-    resolveAll: resolveAll
+    resolveAll: resolveAll,
+    register: register
   });
 
   if (!G.document) {
@@ -680,7 +687,7 @@ function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
 function setupLayout(G) {
   if (!G.$vs) return console.error('Vimesh style core is not loaded!');
   var E = G.$vs._.each;
-  var R = G.$vs._.register;
+  var R = G.$vs.register;
   var GS = G.$vs._.generateSizes;
   var C = G.$vs.config;
   var P = C.prefix;
@@ -1019,9 +1026,10 @@ function setupLayout(G) {
 function setupPaint(G) {
   if (!G.$vs) return console.error('Vimesh style core is not loaded!');
   var E = G.$vs._.each;
-  var R = G.$vs._.register;
+  var R = G.$vs.register;
   var GS = G.$vs._.generateSizes;
   var GC = G.$vs._.generateColors;
+  var EAV = G.$vs._.extractArbitraryValue;
   var C = G.$vs.config;
   var P = C.prefix;
   var _G$$vs$_ = G.$vs._,
@@ -1187,8 +1195,6 @@ function setupPaint(G) {
     xl: 0.75,
     '2xl': 1,
     '3xl': 1.5,
-    '4xl': 2,
-    '5xl': 2.5,
     full: '9999px'
   }, function (s, n) {
     s = isString(s) ? s : s + 'rem';
@@ -1202,6 +1208,22 @@ function setupPaint(G) {
         R("rounded-".concat(v).concat('_' == n ? '' : "-".concat(n)), "border-".concat(DM[v[0]], "-").concat(DM[v[1]], "-radius: ").concat(s, "; "));
       }
     });
+  });
+  R("rounded-[", function (classDetails) {
+    return "border-radius: ".concat(EAV(classDetails.name), ";");
+  });
+  E(dirs, function (v) {
+    if (v.length == 1) {
+      var isTB = 't' == v || 'b' == v;
+      var d2 = isTB ? ['l', 'r'] : ['t', 'b'];
+      R("rounded-".concat(v, "-["), function (classDetails) {
+        return "border-".concat(isTB ? DM[v] : DM[d2[0]], "-").concat(isTB ? DM[d2[0]] : DM[v], "-radius: ").concat(EAV(classDetails.name), "; border-").concat(isTB ? DM[v] : DM[d2[1]], "-").concat(isTB ? DM[d2[1]] : DM[v], "-radius: ").concat(EAV(classDetails.name), ";");
+      });
+    } else {
+      R("rounded-".concat(v, "-["), function (classDetails) {
+        return "border-".concat(DM[v[0]], "-").concat(DM[v[1]], "-radius: ").concat(EAV(classDetails.name), "; ");
+      });
+    }
   });
   E([0, 1, 2, 4, 8], function (w) {
     R("border".concat(w == 1 ? '' : "-".concat(w)), "border-width: ".concat(w, "px;"));
@@ -1344,13 +1366,7 @@ function setupPaint(G) {
     var pos = cn.lastIndexOf('-');
     var name = cn.substring(0, pos);
     var value = cn.substring(pos + 1);
-
-    if (value.startsWith('[') && value.endsWith(']')) {
-      value = value.substring(1, value.length - 1);
-    } else {
-      value = +value / 100;
-    }
-
+    value = EAV(value) || +value / 100;
     if (name === 'scale') return "".concat(transform, "; --").concat(P, "-scale-x: ").concat(s).concat(value, ";--").concat(P, "-scale-y: ").concat(s).concat(value, ";");else return "".concat(transform, "; --").concat(P, "-").concat(name, ": ").concat(s).concat(value, ";");
   }, initTransform);
   R(['rotate-', '-rotate-'], function (classDetails) {
@@ -1363,13 +1379,7 @@ function setupPaint(G) {
     }
 
     var value = cn.substring(cn.lastIndexOf('-') + 1);
-
-    if (value.startsWith('[') && value.endsWith(']')) {
-      value = value.substring(1, value.length - 1);
-    } else {
-      value = "".concat(value, "deg");
-    }
-
+    value = EAV(value) || "".concat(value, "deg");
     return "".concat(transform, "; --").concat(P, "-rotate: ").concat(s).concat(value, ";");
   }, initTransform);
 

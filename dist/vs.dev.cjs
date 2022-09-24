@@ -1,4 +1,4 @@
-// Vimesh Style v0.13.8
+// Vimesh Style v0.13.9
 
 function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
@@ -155,7 +155,7 @@ function setupCore(G) {
         if (!generatorOrStyle) return
         if (!isArray(keys)) keys = [keys]
         if (isFunction(generatorOrStyle))
-            each(keys, key => generators.push({ prefix: key, generator: generatorOrStyle, init: initFunc }))
+            each(keys, key => generators.unshift({ prefix: key, generator: generatorOrStyle, init: initFunc }))
         else
             each(keys, key => {
                 classMap[key] = generatorOrStyle;
@@ -358,50 +358,49 @@ function setupCore(G) {
     function resolveColor(name) {
         if (!name) return null
         name = name.trim()
-        if (name.startsWith('[') && name.endsWith(']')) {
-            name = name.substring(1, name.length - 1)
-            return name
-        }
-        let cv = null
-        let pos = name.lastIndexOf('/')
         let alpha = null
+        let pos = name.lastIndexOf('/')
         if (pos !== -1) {
             let alphaDef = name.substring(pos + 1).trim()
             name = name.substring(0, pos)
-            if (alphaDef.startsWith('[') && alphaDef.endsWith(']')) {
-                alpha = +alphaDef.substring(1, alphaDef.length - 1)
+            let av = extractArbitraryValue(alphaDef)
+            if (av) {
+                alpha = +av
             } else {
                 alpha = +alphaDef / 100
             }
         }
-        if (C.aliasColors[name]) name = C.aliasColors[name]
-        if (C.specialColors[name]) {
-            cv = C.specialColors[name]
-        } else {
-            pos = name.lastIndexOf('-')
-            let depth = null
-            if (pos != -1) {
-                depth = name.substring(pos + 1)
-                name = name.substring(0, pos)
-                let parts = name.split('-')
-                if (parts.length > 1) {
-                    name = parts[0]
-                    for (let i = 1; i < parts.length; i++) {
-                        if (parts[i].length > 0)
-                            name += parts[i][0].toUpperCase() + parts[i].substring(1)
+        let cv = extractArbitraryValue(name)
+        if (!cv) {
+            if (C.aliasColors[name]) name = C.aliasColors[name]
+            if (C.specialColors[name]) {
+                cv = C.specialColors[name]
+            } else {
+                pos = name.lastIndexOf('-')
+                let depth = null
+                if (pos != -1) {
+                    depth = name.substring(pos + 1)
+                    name = name.substring(0, pos)
+                    let parts = name.split('-')
+                    if (parts.length > 1) {
+                        name = parts[0]
+                        for (let i = 1; i < parts.length; i++) {
+                            if (parts[i].length > 0)
+                                name += parts[i][0].toUpperCase() + parts[i].substring(1)
+                        }
                     }
                 }
+                if (C.aliasColors[name]) name = C.aliasColors[name]
+                let color = C.colors[name]
+                if (!color) return null
+                let w = depth ? +depth : 500
+                let index = 50 === w ? 1 : (w / 100) + 1
+                cv = color[index - 1]
             }
-            if (C.aliasColors[name]) name = C.aliasColors[name]
-            let color = C.colors[name]
-            if (!color) return null
-            let w = depth ? +depth : 500
-            let index = 50 === w ? 1 : (w / 100) + 1
-            cv = color[index - 1]
         }
-        if (cv && cv[0] === '#' && alpha !== null) {
+        if (cv && cv[0] === '#') {
             cv = hexToRgb(cv)
-            cv.a = alpha
+            if (alpha !== null) cv.a = alpha
         }
         return cv
     }
@@ -436,22 +435,31 @@ function setupCore(G) {
             }
         })
     }
+    function extractArbitraryValue(name) {
+        if (!name) return null
+        let p1 = name.indexOf('[')
+        let p2 = name.indexOf(']')
+        if (p1 >= 0 && p2 > p1)
+            return name.substring(p1 + 1, p2)
+        return null
+    }
     extend($vs._, {
         hexToRgb,
         rgbToHex,
-        register,
         resolveColor,
         generateColors,
         generateSizes,
         resolveClass,
-        addInitStyle
+        addInitStyle,
+        extractArbitraryValue
     })
     extend($vs, {
         get styles() { return stylesOutput },
         reset: resetStyles,
         extract: extractClasses,
         add: addClasses,
-        resolveAll
+        resolveAll,
+        register
     })
 
     if (!G.document) {
@@ -504,7 +512,7 @@ function setupPreset(G) {
 function setupLayout(G) {
     if (!G.$vs) return console.error('Vimesh style core is not loaded!')
     const E = G.$vs._.each
-    const R = G.$vs._.register
+    const R = G.$vs.register
     const GS = G.$vs._.generateSizes
     const C = G.$vs.config
     const P = C.prefix
@@ -738,9 +746,10 @@ function setupLayout(G) {
 function setupPaint(G) {
     if (!G.$vs) return console.error('Vimesh style core is not loaded!')
     const E = G.$vs._.each
-    const R = G.$vs._.register
+    const R = G.$vs.register
     const GS = G.$vs._.generateSizes
     const GC = G.$vs._.generateColors
+    const EAV = G.$vs._.extractArbitraryValue
     const C = G.$vs.config
     const P = C.prefix
     const { rgbToHex, resolveColor, addInitStyle, isString } = G.$vs._
@@ -831,7 +840,7 @@ function setupPaint(G) {
 
     // Border
     R(`rounded-none`, `border-radius: 0px;`)
-    E({ none: '0px', sm: 0.125, _: 0.25, md: 0.375, lg: 0.5, xl: 0.75, '2xl': 1, '3xl': 1.5, '4xl': 2, '5xl': 2.5, full: '9999px' }, (s, n) => {
+    E({ none: '0px', sm: 0.125, _: 0.25, md: 0.375, lg: 0.5, xl: 0.75, '2xl': 1, '3xl': 1.5, full: '9999px' }, (s, n) => {
         s = isString(s) ? s : s + 'rem'
         R(`rounded${'_' == n ? '' : `-${n}`}`, `border-radius: ${s};`)
         E(dirs, v => {
@@ -843,6 +852,16 @@ function setupPaint(G) {
                 R(`rounded-${v}${'_' == n ? '' : `-${n}`}`, `border-${DM[v[0]]}-${DM[v[1]]}-radius: ${s}; `)
             }
         })
+    })
+    R(`rounded-[`, (classDetails) => `border-radius: ${EAV(classDetails.name)};`)
+    E(dirs, v => {
+        if (v.length == 1) {
+            let isTB = 't' == v || 'b' == v
+            let d2 = isTB ? ['l', 'r'] : ['t', 'b']
+            R(`rounded-${v}-[`, (classDetails) => `border-${isTB ? DM[v] : DM[d2[0]]}-${isTB ? DM[d2[0]] : DM[v]}-radius: ${EAV(classDetails.name)}; border-${isTB ? DM[v] : DM[d2[1]]}-${isTB ? DM[d2[1]] : DM[v]}-radius: ${EAV(classDetails.name)};`)
+        } else {
+            R(`rounded-${v}-[`, (classDetails) => `border-${DM[v[0]]}-${DM[v[1]]}-radius: ${EAV(classDetails.name)}; `)
+        }
     })
     E([0, 1, 2, 4, 8], w => {
         R(`border${w == 1 ? '' : `-${w}`}`, `border-width: ${w}px;`)
@@ -943,11 +962,7 @@ function setupPaint(G) {
         let pos = cn.lastIndexOf('-')
         let name = cn.substring(0, pos)
         let value = cn.substring(pos + 1)
-        if (value.startsWith('[') && value.endsWith(']')) {
-            value = value.substring(1, value.length - 1)
-        } else {
-            value = +value / 100
-        }
+        value = EAV(value) || (+value / 100)
         if (name === 'scale')
             return `${transform}; --${P}-scale-x: ${s}${value};--${P}-scale-y: ${s}${value};`
         else
@@ -961,11 +976,7 @@ function setupPaint(G) {
             s = '-'
         }
         let value = cn.substring(cn.lastIndexOf('-') + 1)
-        if (value.startsWith('[') && value.endsWith(']')) {
-            value = value.substring(1, value.length - 1)
-        } else {
-            value = `${value}deg`
-        }
+        value = EAV(value) || `${value}deg`
         return `${transform}; --${P}-rotate: ${s}${value};`
     }, initTransform)
     function genTrans(name, value) {

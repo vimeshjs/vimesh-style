@@ -2,9 +2,10 @@
 function setupPaint(G) {
     if (!G.$vs) return console.error('Vimesh style core is not loaded!')
     const E = G.$vs._.each
-    const R = G.$vs._.register
+    const R = G.$vs.register
     const GS = G.$vs._.generateSizes
     const GC = G.$vs._.generateColors
+    const EAV = G.$vs._.extractArbitraryValue
     const C = G.$vs.config
     const P = C.prefix
     const { rgbToHex, resolveColor, addInitStyle, isString } = G.$vs._
@@ -95,7 +96,7 @@ function setupPaint(G) {
 
     // Border
     R(`rounded-none`, `border-radius: 0px;`)
-    E({ none: '0px', sm: 0.125, _: 0.25, md: 0.375, lg: 0.5, xl: 0.75, '2xl': 1, '3xl': 1.5, '4xl': 2, '5xl': 2.5, full: '9999px' }, (s, n) => {
+    E({ none: '0px', sm: 0.125, _: 0.25, md: 0.375, lg: 0.5, xl: 0.75, '2xl': 1, '3xl': 1.5, full: '9999px' }, (s, n) => {
         s = isString(s) ? s : s + 'rem'
         R(`rounded${'_' == n ? '' : `-${n}`}`, `border-radius: ${s};`)
         E(dirs, v => {
@@ -107,6 +108,16 @@ function setupPaint(G) {
                 R(`rounded-${v}${'_' == n ? '' : `-${n}`}`, `border-${DM[v[0]]}-${DM[v[1]]}-radius: ${s}; `)
             }
         })
+    })
+    R(`rounded-[`, (classDetails) => `border-radius: ${EAV(classDetails.name)};`)
+    E(dirs, v => {
+        if (v.length == 1) {
+            let isTB = 't' == v || 'b' == v
+            let d2 = isTB ? ['l', 'r'] : ['t', 'b']
+            R(`rounded-${v}-[`, (classDetails) => `border-${isTB ? DM[v] : DM[d2[0]]}-${isTB ? DM[d2[0]] : DM[v]}-radius: ${EAV(classDetails.name)}; border-${isTB ? DM[v] : DM[d2[1]]}-${isTB ? DM[d2[1]] : DM[v]}-radius: ${EAV(classDetails.name)};`)
+        } else {
+            R(`rounded-${v}-[`, (classDetails) => `border-${DM[v[0]]}-${DM[v[1]]}-radius: ${EAV(classDetails.name)}; `)
+        }
     })
     E([0, 1, 2, 4, 8], w => {
         R(`border${w == 1 ? '' : `-${w}`}`, `border-width: ${w}px;`)
@@ -207,11 +218,7 @@ function setupPaint(G) {
         let pos = cn.lastIndexOf('-')
         let name = cn.substring(0, pos)
         let value = cn.substring(pos + 1)
-        if (value.startsWith('[') && value.endsWith(']')) {
-            value = value.substring(1, value.length - 1)
-        } else {
-            value = +value / 100
-        }
+        value = EAV(value) || (+value / 100)
         if (name === 'scale')
             return `${transform}; --${P}-scale-x: ${s}${value};--${P}-scale-y: ${s}${value};`
         else
@@ -225,11 +232,7 @@ function setupPaint(G) {
             s = '-'
         }
         let value = cn.substring(cn.lastIndexOf('-') + 1)
-        if (value.startsWith('[') && value.endsWith(']')) {
-            value = value.substring(1, value.length - 1)
-        } else {
-            value = `${value}deg`
-        }
+        value = EAV(value) || `${value}deg`
         return `${transform}; --${P}-rotate: ${s}${value};`
     }, initTransform)
     function genTrans(name, value) {
