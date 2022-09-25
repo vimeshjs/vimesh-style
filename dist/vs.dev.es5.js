@@ -1,4 +1,4 @@
-// Vimesh Style (ES5) v0.13.9
+// Vimesh Style (ES5) v0.14.0
 "use strict";
 
 function _wrapRegExp() { _wrapRegExp = function _wrapRegExp(re, groups) { return new BabelRegExp(re, void 0, groups); }; var _super = RegExp.prototype, _groups = new WeakMap(); function BabelRegExp(re, flags, groups) { var _this = new RegExp(re, flags); return _groups.set(_this, groups || _groups.get(re)), _setPrototypeOf(_this, BabelRegExp.prototype); } function buildGroups(result, re) { var g = _groups.get(re); return Object.keys(g).reduce(function (groups, name) { return groups[name] = result[g[name]], groups; }, Object.create(null)); } return _inherits(BabelRegExp, RegExp), BabelRegExp.prototype.exec = function (str) { var result = _super.exec.call(this, str); return result && (result.groups = buildGroups(result, this)), result; }, BabelRegExp.prototype[Symbol.replace] = function (str, substitution) { if ("string" == typeof substitution) { var groups = _groups.get(this); return _super[Symbol.replace].call(this, str, substitution.replace(/\$<([^>]+)>/g, function (_, name) { return "$" + groups[name]; })); } if ("function" == typeof substitution) { var _this = this; return _super[Symbol.replace].call(this, str, function () { var args = arguments; return "object" != _typeof(args[args.length - 1]) && (args = [].slice.call(args)).push(buildGroups(args, _this)), substitution.apply(this, args); }); } return _super[Symbol.replace].call(this, str, substitution); }, _wrapRegExp.apply(this, arguments); }
@@ -689,6 +689,7 @@ function setupLayout(G) {
   var E = G.$vs._.each;
   var R = G.$vs.register;
   var GS = G.$vs._.generateSizes;
+  var EAV = G.$vs._.extractArbitraryValue;
   var C = G.$vs.config;
   var P = C.prefix;
   var i; // Container
@@ -733,6 +734,9 @@ function setupLayout(G) {
   });
   GS(function (name, value) {
     R("basis-".concat(name), "flex-basis: ".concat(value, ";"));
+  });
+  R("basis-[", function (classDetails) {
+    return "flex-basis: ".concat(EAV(classDetails.name), ";");
   }); // Clear
 
   E(['left', 'right', 'both', 'none'], function (v) {
@@ -766,6 +770,12 @@ function setupLayout(G) {
   GS(function (name, value) {
     R("w-".concat(name), "width: ".concat(value, ";"));
     R("h-".concat(name), "height: ".concat(value, ";"));
+  });
+  R("w-[", function (classDetails) {
+    return "width: ".concat(EAV(classDetails.name), ";");
+  });
+  R("h-[", function (classDetails) {
+    return "height: ".concat(EAV(classDetails.name), ";");
   }); // Min & Max Width
 
   var ws = {
@@ -793,6 +803,12 @@ function setupLayout(G) {
 
   E(ws, function (v, k) {
     return R("max-w-".concat(k), "max-width: ".concat(v, ";"));
+  });
+  R("min-w-[", function (classDetails) {
+    return "min-width: ".concat(EAV(classDetails.name), ";");
+  });
+  R("max-w-[", function (classDetails) {
+    return "max-width: ".concat(EAV(classDetails.name), ";");
   }); // Min & Max Height
 
   E({
@@ -808,6 +824,12 @@ function setupLayout(G) {
   });
   GS(function (name, value) {
     R("max-h-".concat(name), "max-height: ".concat(value, ";"));
+  });
+  R("min-h-[", function (classDetails) {
+    return "min-height: ".concat(EAV(classDetails.name), ";");
+  });
+  R("max-h-[", function (classDetails) {
+    return "max-height: ".concat(EAV(classDetails.name), ";");
   }); // Padding & Margin 
 
   function generateMargins(s, name, value) {
@@ -840,6 +862,36 @@ function setupLayout(G) {
     E(['', '-'], function (s) {
       return generateMargins(s, name, value);
     });
+  });
+  R(["p-[", "px-[", "pl-[", "pr-[", "py-[", "pt-[", "pb-["], function (classDetails) {
+    var value = EAV(classDetails.name);
+
+    var has = function has(kw) {
+      return classDetails.name.indexOf(kw) !== -1;
+    };
+
+    var pl = "padding-left: ".concat(value, ";");
+    var pr = "padding-right: ".concat(value, ";");
+    var pt = "padding-top: ".concat(value, ";");
+    var pb = "padding-bottom: ".concat(value, ";");
+    if (has('px-')) return "".concat(pl).concat(pr);else if (has('pl-')) return "".concat(pl);else if (has('pr-')) return "".concat(pr);else if (has('py-')) return "".concat(pt).concat(pb);else if (has('pt-')) return "".concat(pt);else if (has('pb-')) return "".concat(pb);
+    return "padding: ".concat(value, ";");
+  });
+  E(['', '-'], function (s) {
+    R(["".concat(s, "m-["), "".concat(s, "mx-["), "".concat(s, "ml-["), "".concat(s, "mr-["), "".concat(s, "my-["), "".concat(s, "mt-["), "".concat(s, "mb-[")], function (classDetails) {
+      var value = EAV(classDetails.name);
+
+      var has = function has(kw) {
+        return classDetails.name.indexOf(kw) !== -1;
+      };
+
+      var ml = "margin-left: ".concat(s).concat(value, ";");
+      var mr = "margin-right: ".concat(s).concat(value, ";");
+      var mt = "margin-top: ".concat(s).concat(value, ";");
+      var mb = "margin-bottom: ".concat(s).concat(value, ";");
+      if (has('mx-')) return "".concat(ml).concat(mr);else if (has('ml-')) return "".concat(ml);else if (has('mr-')) return "".concat(mr);else if (has('my-')) return "".concat(mt).concat(mb);else if (has('mt-')) return "".concat(mt);else if (has('mb-')) return "".concat(mb);
+      return "margin: ".concat(s).concat(value, ";");
+    });
   }); // Top / Right / Bottom / Left
 
   GS(function (name, value) {
@@ -856,6 +908,22 @@ function setupLayout(G) {
       R("".concat(s, "top-").concat(name), "".concat(t));
       R("".concat(s, "bottom-").concat(name), "".concat(b));
     });
+  });
+  E(['', '-'], function (s) {
+    R(["".concat(s, "inset-["), "".concat(s, "inset-x-["), "".concat(s, "left-["), "".concat(s, "right-["), "".concat(s, "inset-y-["), "".concat(s, "top-["), "".concat(s, "bottom-[")], function (classDetails) {
+      var value = EAV(classDetails.name);
+      var l = "left: ".concat(s).concat(value, ";");
+      var r = "right: ".concat(s).concat(value, ";");
+      var t = "top: ".concat(s).concat(value, ";");
+      var b = "bottom: ".concat(s).concat(value, ";");
+
+      var has = function has(kw) {
+        return classDetails.name.indexOf(kw) !== -1;
+      };
+
+      if (has('inset-x')) return "".concat(l).concat(r);else if (has('inset-y')) return "".concat(t).concat(b);else if (has('inset')) return "".concat(l).concat(r).concat(t).concat(b);else if (has('left')) return "".concat(l);else if (has('right')) return "".concat(r);else if (has('top')) return "".concat(t);else if (has('bottom')) return "".concat(b);
+      return null;
+    });
   }); // Space
 
   var sc = ' > :not([hidden]) ~ :not([hidden])';
@@ -870,13 +938,27 @@ function setupLayout(G) {
   GS(function (name, value) {
     E({
       x: ['right', 'left'],
-      y: ['top', 'bottom']
+      y: ['bottom', 'top']
     }, function (vs, k) {
       return E(['', '-'], function (s) {
         R("".concat(s, "space-").concat(k, "-").concat(name), {
           name: "$".concat(sc),
           style: "--".concat(P, "-space-").concat(k, "-reverse: 0;margin-").concat(vs[0], ": calc(").concat(s).concat(value, " * var(--").concat(P, "-space-").concat(k, "-reverse));margin-").concat(vs[1], ": calc(").concat(s).concat(value, " * calc(1 - var(--").concat(P, "-space-").concat(k, "-reverse)));")
         });
+      });
+    });
+  });
+  E({
+    x: ['right', 'left'],
+    y: ['bottom', 'top']
+  }, function (vs, k) {
+    return E(['', '-'], function (s) {
+      R("".concat(s, "space-").concat(k, "-["), function (classDetails) {
+        var value = EAV(classDetails.name);
+        return {
+          name: "$".concat(sc),
+          style: "--".concat(P, "-space-").concat(k, "-reverse: 0;margin-").concat(vs[0], ": calc(").concat(s).concat(value, " * var(--").concat(P, "-space-").concat(k, "-reverse));margin-").concat(vs[1], ": calc(").concat(s).concat(value, " * calc(1 - var(--").concat(P, "-space-").concat(k, "-reverse)));")
+        };
       });
     });
   }); // Order
@@ -940,6 +1022,15 @@ function setupLayout(G) {
     R("gap-".concat(name), "gap: ".concat(value, ";"));
     R("gap-x-".concat(name), "column-gap: ".concat(value, ";"));
     R("gap-y-".concat(name), "row-gap: ".concat(value, ";"));
+  });
+  R("gap-[", function (classDetails) {
+    return "gap: ".concat(EAV(classDetails.name), ";");
+  });
+  R("gap-x-[", function (classDetails) {
+    return "column-gap: ".concat(EAV(classDetails.name), ";");
+  });
+  R("gap-y-[", function (classDetails) {
+    return "row-gap: ".concat(EAV(classDetails.name), ";");
   }); // Justify & Align & Place
 
   E({
@@ -1294,7 +1385,8 @@ function setupPaint(G) {
     none: '0 0 #0000'
   }, function (v, k) {
     return R("shadow".concat(k == '_' ? '' : "-".concat(k)), "--".concat(P, "-shadow: ").concat(v, ";").concat(bs), initRing);
-  });
+  }); //GC('shadow', `--${P}-shadow-color`)
+
   R("opacity-", function (classDetails) {
     var parts = classDetails.name.split('-');
     return "opacity: ".concat(+parts[1] / 100, ";");

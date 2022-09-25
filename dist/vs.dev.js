@@ -1,4 +1,4 @@
-// Vimesh Style v0.13.9
+// Vimesh Style v0.14.0
 
 function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
@@ -514,6 +514,7 @@ function setupLayout(G) {
     const E = G.$vs._.each
     const R = G.$vs.register
     const GS = G.$vs._.generateSizes
+    const EAV = G.$vs._.extractArbitraryValue
     const C = G.$vs.config
     const P = C.prefix
     let i
@@ -550,6 +551,7 @@ function setupLayout(G) {
     GS((name, value) => {
         R(`basis-${name}`, `flex-basis: ${value};`)
     })
+    R(`basis-[`, classDetails => `flex-basis: ${EAV(classDetails.name)};`)
     // Clear
     E(['left', 'right', 'both', 'none'], v => R(`clear-${v}`, `clear: ${v};`))
 
@@ -563,6 +565,8 @@ function setupLayout(G) {
         R(`w-${name}`, `width: ${value};`)
         R(`h-${name}`, `height: ${value};`)
     })
+    R(`w-[`, classDetails => `width: ${EAV(classDetails.name)};`)
+    R(`h-[`, classDetails => `height: ${EAV(classDetails.name)};`)
 
     // Min & Max Width
     const ws = { '0': '0px', full: '100%', min: 'min-content', max: 'max-content', fit: 'fit-content' }
@@ -573,6 +577,8 @@ function setupLayout(G) {
     E(['sm', 'md', 'lg', 'xl', '2xl'], v => ws[`screen-${v}`] = `${C.breakpoints[v]}px`)
     for (i = 2; i <= 7; i++) ws[`${i}xl`] = `${30 + i * 6}rem`
     E(ws, (v, k) => R(`max-w-${k}`, `max-width: ${v};`))
+    R(`min-w-[`, classDetails => `min-width: ${EAV(classDetails.name)};`)
+    R(`max-w-[`, classDetails => `max-width: ${EAV(classDetails.name)};`)
 
     // Min & Max Height
     E({ '0': '0px', full: '100%', screen: '100vh', min: 'min-content', max: 'max-content', fit: 'fit-content' }, (v, k) => {
@@ -582,6 +588,8 @@ function setupLayout(G) {
     GS((name, value) => {
         R(`max-h-${name}`, `max-height: ${value};`)
     })
+    R(`min-h-[`, classDetails => `min-height: ${EAV(classDetails.name)};`)
+    R(`max-h-[`, classDetails => `max-height: ${EAV(classDetails.name)};`)
 
     // Padding & Margin 
     function generateMargins(s, name, value) {
@@ -613,6 +621,39 @@ function setupLayout(G) {
 
         E(['', '-'], s => generateMargins(s, name, value))
     })
+    R([`p-[`, `px-[`, `pl-[`, `pr-[`, `py-[`, `pt-[`, `pb-[`], classDetails => {
+        const value = EAV(classDetails.name)
+        const has = kw => classDetails.name.indexOf(kw) !== -1
+        const pl = `padding-left: ${value};`
+        const pr = `padding-right: ${value};`
+        const pt = `padding-top: ${value};`
+        const pb = `padding-bottom: ${value};`
+        if (has('px-')) return `${pl}${pr}`
+        else if (has('pl-')) return `${pl}`
+        else if (has('pr-')) return `${pr}`
+        else if (has('py-')) return `${pt}${pb}`
+        else if (has('pt-')) return `${pt}`
+        else if (has('pb-')) return `${pb}`
+        return `padding: ${value};`
+    })
+    E(['', '-'], s => {
+        R([`${s}m-[`, `${s}mx-[`, `${s}ml-[`, `${s}mr-[`, `${s}my-[`, `${s}mt-[`, `${s}mb-[`], classDetails => {
+            const value = EAV(classDetails.name)
+            const has = kw => classDetails.name.indexOf(kw) !== -1
+            const ml = `margin-left: ${s}${value};`
+            const mr = `margin-right: ${s}${value};`
+            const mt = `margin-top: ${s}${value};`
+            const mb = `margin-bottom: ${s}${value};`
+            if (has('mx-')) return `${ml}${mr}`
+            else if (has('ml-')) return `${ml}`
+            else if (has('mr-')) return `${mr}`
+            else if (has('my-')) return `${mt}${mb}`
+            else if (has('mt-')) return `${mt}`
+            else if (has('mb-')) return `${mb}`
+            return `margin: ${s}${value};`
+        })
+    })
+
 
     // Top / Right / Bottom / Left
     GS((name, value) => {
@@ -630,16 +671,41 @@ function setupLayout(G) {
             R(`${s}bottom-${name}`, `${b}`)
         })
     })
+    E(['', '-'], s => {
+        R([`${s}inset-[`, `${s}inset-x-[`, `${s}left-[`, `${s}right-[`, `${s}inset-y-[`, `${s}top-[`, `${s}bottom-[`], classDetails => {
+            let value = EAV(classDetails.name)
+            const l = `left: ${s}${value};`
+            const r = `right: ${s}${value};`
+            const t = `top: ${s}${value};`
+            const b = `bottom: ${s}${value};`
+            const has = kw => classDetails.name.indexOf(kw) !== -1
+            if (has('inset-x')) return `${l}${r}`
+            else if (has('inset-y')) return `${t}${b}`
+            else if (has('inset')) return `${l}${r}${t}${b}`
+            else if (has('left')) return `${l}`
+            else if (has('right')) return `${r}`
+            else if (has('top')) return `${t}`
+            else if (has('bottom')) return `${b}`
+            return null
+        })
+    })
 
     // Space
     const sc = ' > :not([hidden]) ~ :not([hidden])'
     R('space-x-reverse', { name: `$${sc}`, style: `--${P}-space-x-reverse: 1;` })
     R('space-y-reverse', { name: `$${sc}`, style: `--${P}-space-y-reverse: 1;` })
     GS((name, value) => {
-        E({ x: ['right', 'left'], y: ['top', 'bottom'] }, (vs, k) => E(['', '-'], (s) => {
+        E({ x: ['right', 'left'], y: ['bottom', 'top'] }, (vs, k) => E(['', '-'], (s) => {
             R(`${s}space-${k}-${name}`, { name: `$${sc}`, style: `--${P}-space-${k}-reverse: 0;margin-${vs[0]}: calc(${s}${value} * var(--${P}-space-${k}-reverse));margin-${vs[1]}: calc(${s}${value} * calc(1 - var(--${P}-space-${k}-reverse)));` })
         }))
     })
+    E({ x: ['right', 'left'], y: ['bottom', 'top'] }, (vs, k) => E(['', '-'], (s) => {
+        R(`${s}space-${k}-[`, classDetails => {
+            const value = EAV(classDetails.name)
+            return { name: `$${sc}`, style: `--${P}-space-${k}-reverse: 0;margin-${vs[0]}: calc(${s}${value} * var(--${P}-space-${k}-reverse));margin-${vs[1]}: calc(${s}${value} * calc(1 - var(--${P}-space-${k}-reverse)));` }
+        }
+        )
+    }))
 
     // Order
     E({ first: -9999, last: 9999, none: 0 }, (v, k) => R(`order-${k}`, `order: ${v};`))
@@ -677,6 +743,10 @@ function setupLayout(G) {
         R(`gap-x-${name}`, `column-gap: ${value};`)
         R(`gap-y-${name}`, `row-gap: ${value};`)
     })
+
+    R(`gap-[`, classDetails => `gap: ${EAV(classDetails.name)};`)
+    R(`gap-x-[`, classDetails => `column-gap: ${EAV(classDetails.name)};`)
+    R(`gap-y-[`, classDetails => `row-gap: ${EAV(classDetails.name)};`)
 
     // Justify & Align & Place
     E({ start: 'flex-start', end: 'flex-end', center: 'center', between: 'space-between', around: 'space-around', evenly: 'space-evenly' }, (v, k) => {
@@ -909,6 +979,8 @@ function setupPaint(G) {
         inner: 'inset 0 2px 4px 0 rgb(0 0 0 / 0.05)',
         none: '0 0 #0000'
     }, (v, k) => R(`shadow${k == '_' ? '' : `-${k}`}`, `--${P}-shadow: ${v};${bs}`, initRing))
+
+    //GC('shadow', `--${P}-shadow-color`)
 
     R(`opacity-`, classDetails => {
         let parts = classDetails.name.split('-')

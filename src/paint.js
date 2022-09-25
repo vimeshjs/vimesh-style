@@ -166,6 +166,8 @@ function setupPaint(G) {
         none: '0 0 #0000'
     }, (v, k) => R(`shadow${k == '_' ? '' : `-${k}`}`, `--${P}-shadow: ${v};${bs}`, initRing))
 
+    //GC('shadow', `--${P}-shadow-color`)
+
     R(`opacity-`, classDetails => {
         let parts = classDetails.name.split('-')
         return `opacity: ${+parts[1] / 100};`
