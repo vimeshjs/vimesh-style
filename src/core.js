@@ -119,6 +119,7 @@ function setupCore(G) {
     let initMap = {}
     let autoStyles = {}
     let initStyles = []
+    let macroCss = []
     let styleElement = null
     let stylesOutput = null
     let generators = $vs.generators = []
@@ -177,10 +178,24 @@ function setupCore(G) {
         if (!style && C.debug) console.log(`Unknown class: ${className}`)
         return style
     }
+    function addMacroCss(css){
+        if (isPlainObject(css))
+            macroCss.push(css)
+        else if (isArray(css))
+            macroCss.push(...css)
+    }
     function updateAutoStyles() {
         let keys = Object.keys(autoStyles).sort((a, b) => (C.breakpoints[a] || 0) - (C.breakpoints[b] || 0))
         let all = initStyles
         each(keys, k => all = all.concat(autoStyles[k]))
+        let macroStyles = []
+        each(macroCss, css => {
+            each(css, (macro, selectors) => {
+                let extended = macro.split(' ').map(cls => resolveClass(cls)).join('')
+                macroStyles.push(`${selectors} {${extended}}`)
+            })
+        })
+        all = all.concat(macroStyles)
         if (all.length > 0) {
             let newStyles = (C.preset ? [C.preset] : []).concat(all).join('\n')
             if (newStyles !== stylesOutput) {
@@ -457,6 +472,7 @@ function setupCore(G) {
         reset: resetStyles,
         extract: extractClasses,
         add: addClasses,
+        addMacroCss,
         resolveAll,
         register
     })
