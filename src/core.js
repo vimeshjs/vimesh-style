@@ -64,7 +64,9 @@ function setupCore(G) {
                 ping: `ping 1s cubic-bezier(0, 0, 0.2, 1) infinite`,
                 pulse: `pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite`,
                 bounce: `bounce 1s infinite`
-            }
+            },
+            fontSizes: {}, // Font sizes to override
+            borderRadiusSizes : {} // Border radius sizes to override
         }
     }
 
@@ -76,6 +78,9 @@ function setupCore(G) {
     }
     function isArray(array) {
         return Array.isArray(array)
+    }
+    function isNumeric(n) {
+        return !isNaN(parseFloat(n)) && isFinite(n);
     }
     function isFunction(func) {
         return typeof func === "function";
@@ -100,6 +105,7 @@ function setupCore(G) {
         if (length < 1 || target == null) return target
         for (let i = 0; i < length; i++) {
             const source = sources[i]
+            if (!source) continue
             Object.keys(source).forEach((key) => {
                 var desc = Object.getOwnPropertyDescriptor(source, key)
                 if (desc.get || desc.set) {
@@ -111,7 +117,7 @@ function setupCore(G) {
         }
         return target
     }
-    $vs._ = { isString, isArray, isFunction, isPlainObject, each, extend }
+    $vs._ = { isString, isNumeric, isArray, isFunction, isPlainObject, each, extend }
 
     const KNOWN_ATTR_NAMES = 'font,text,underline,list,bg,gradient,border,divide,ring,icon,container,p,m,space,w,min-w,max-w,h,min-h,max-h,flex,grid,table,order,align,justify,place,display,pos,box,caret,isolation,object,overflow,overscroll,z,shadow,opacity,blend,filter,backdrop,transition,animate,transform,appearance,cursor,outline,pointer,resize,select,sr'
     let addedClasses = {}
@@ -125,6 +131,7 @@ function setupCore(G) {
     let generators = $vs.generators = []
     let cache = {}
     let knownAttributes = {}
+    let resetListeners = []
     each(KNOWN_ATTR_NAMES.split(','), a => knownAttributes[a] = true)
 
     function decomposeClassName(className) {
@@ -178,7 +185,7 @@ function setupCore(G) {
         if (!style && C.debug) console.log(`Unknown class: ${className}`)
         return style
     }
-    function addMacroCss(css){
+    function addMacroCss(css) {
         if (isPlainObject(css))
             macroCss.push(css)
         else if (isArray(css))
@@ -334,6 +341,7 @@ function setupCore(G) {
         addClasses(allClasses, update)
     }
     function resetStyles() {
+        each(resetListeners, callback => callback())
         addedClasses = {}
         autoStyles = {}
         stylesOutput = null
@@ -342,6 +350,10 @@ function setupCore(G) {
             styleElement.innerHTML = null
             if (C.auto && G.document) resolveAll(G.document.body)
         }
+    }
+    function autoGenerateOnReset(callback) {
+        resetListeners.push(callback)
+        callback()
     }
     const CLASS_NAMES = /class\s*=\s*['\"](?<class>[^'\"]*)['\"]/g
     function extractClasses(html) {
@@ -465,6 +477,7 @@ function setupCore(G) {
         generateSizes,
         resolveClass,
         addInitStyle,
+        autoGenerateOnReset,
         extractArbitraryValue
     })
     extend($vs, {

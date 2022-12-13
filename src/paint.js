@@ -1,11 +1,12 @@
 
 function setupPaint(G) {
     if (!G.$vs) return console.error('Vimesh style core is not loaded!')
-    const E = G.$vs._.each
+    const _ = G.$vs._
+    const E = _.each
     const R = G.$vs.register
-    const GS = G.$vs._.generateSizes
-    const GC = G.$vs._.generateColors
-    const EAV = G.$vs._.extractArbitraryValue
+    const GS = _.generateSizes
+    const GC = _.generateColors
+    const EAV = _.extractArbitraryValue
     const C = G.$vs.config
     const P = C.prefix
     const { rgbToHex, resolveColor, addInitStyle, isString } = G.$vs._
@@ -18,11 +19,16 @@ function setupPaint(G) {
         if (!font) return null
         return `font-family: ${font};`
     })
-
-    E({
-        xs: [0.75, 1], sm: [0.875, 1.25], base: [1, 1.5], lg: [1.125, 1.75], xl: [1.25, 1.75],
-        '2xl': [1.5, 2], '3xl': [1.875, 2.25], '4xl': [2.25, 2.5], '5xl': [3], '6xl': [3.75], '7xl': [4.5], '8xl': [6], '9xl': [8]
-    }, (v, k) => R(`text-${k}`, `font-size: ${v[0]}rem;line-height: ${v.length > 1 ? `${v[1]}rem` : 1};`))
+    function sizeWithUnit(s, defUnit = 'rem') {
+        return _.isNumeric(s) ? `${s}${defUnit}` : s
+    }
+    _.autoGenerateOnReset(() => {
+        const fontSizes = _.extend({
+            xs: [0.75, 1], sm: [0.875, 1.25], base: [1, 1.5], lg: [1.125, 1.75], xl: [1.25, 1.75],
+            '2xl': [1.5, 2], '3xl': [1.875, 2.25], '4xl': [2.25, 2.5], '5xl': [3], '6xl': [3.75], '7xl': [4.5], '8xl': [6], '9xl': [8]
+        }, C.fontSizes)
+        E(fontSizes, (v, k) => R(`text-${k}`, `font-size: ${sizeWithUnit(v[0])};line-height: ${v.length > 1 ? `${sizeWithUnit(v[1])}` : 1};`))
+    })
 
     R(`antialiased`, `-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;`)
     R(`subpixel-antialiased`, `-webkit-font-smoothing: auto; -moz-osx-font-smoothing: auto;`)
@@ -95,18 +101,20 @@ function setupPaint(G) {
     E([0, 1, 2], v => R(`stroke-${v}`, `stroke-width: ${v}`))
 
     // Border
-    R(`rounded-none`, `border-radius: 0px;`)
-    E({ none: '0px', sm: 0.125, _: 0.25, md: 0.375, lg: 0.5, xl: 0.75, '2xl': 1, '3xl': 1.5, full: '9999px' }, (s, n) => {
-        s = isString(s) ? s : s + 'rem'
-        R(`rounded${'_' == n ? '' : `-${n}`}`, `border-radius: ${s};`)
-        E(dirs, v => {
-            if (v.length == 1) {
-                let isTB = 't' == v || 'b' == v
-                let d2 = isTB ? ['l', 'r'] : ['t', 'b']
-                R(`rounded-${v}${'_' == n ? '' : `-${n}`}`, `border-${isTB ? DM[v] : DM[d2[0]]}-${isTB ? DM[d2[0]] : DM[v]}-radius: ${s}; border-${isTB ? DM[v] : DM[d2[1]]}-${isTB ? DM[d2[1]] : DM[v]}-radius: ${s};`)
-            } else {
-                R(`rounded-${v}${'_' == n ? '' : `-${n}`}`, `border-${DM[v[0]]}-${DM[v[1]]}-radius: ${s}; `)
-            }
+    _.autoGenerateOnReset(() => {
+        const borderRadiusSizes = _.extend({ none: '0px', sm: 0.125, _: 0.25, md: 0.375, lg: 0.5, xl: 0.75, '2xl': 1, '3xl': 1.5, full: '9999px' }, C.borderRadiusSizes)
+        E(borderRadiusSizes, (s, n) => {
+            s = sizeWithUnit(s)
+            R(`rounded${'_' == n ? '' : `-${n}`}`, `border-radius: ${s};`)
+            E(dirs, v => {
+                if (v.length == 1) {
+                    let isTB = 't' == v || 'b' == v
+                    let d2 = isTB ? ['l', 'r'] : ['t', 'b']
+                    R(`rounded-${v}${'_' == n ? '' : `-${n}`}`, `border-${isTB ? DM[v] : DM[d2[0]]}-${isTB ? DM[d2[0]] : DM[v]}-radius: ${s}; border-${isTB ? DM[v] : DM[d2[1]]}-${isTB ? DM[d2[1]] : DM[v]}-radius: ${s};`)
+                } else {
+                    R(`rounded-${v}${'_' == n ? '' : `-${n}`}`, `border-${DM[v[0]]}-${DM[v[1]]}-radius: ${s}; `)
+                }
+            })
         })
     })
     R(`rounded-[`, (classDetails) => `border-radius: ${EAV(classDetails.name)};`)

@@ -1,4 +1,4 @@
-// Vimesh Style (ES5) v1.0.0
+// Vimesh Style (ES5) v1.0.1
 "use strict";
 
 function _wrapRegExp() { _wrapRegExp = function _wrapRegExp(re, groups) { return new BabelRegExp(re, void 0, groups); }; var _super = RegExp.prototype, _groups = new WeakMap(); function BabelRegExp(re, flags, groups) { var _this = new RegExp(re, flags); return _groups.set(_this, groups || _groups.get(re)), _setPrototypeOf(_this, BabelRegExp.prototype); } function buildGroups(result, re) { var g = _groups.get(re); return Object.keys(g).reduce(function (groups, name) { return groups[name] = result[g[name]], groups; }, Object.create(null)); } return _inherits(BabelRegExp, RegExp), BabelRegExp.prototype.exec = function (str) { var result = _super.exec.call(this, str); return result && (result.groups = buildGroups(result, this)), result; }, BabelRegExp.prototype[Symbol.replace] = function (str, substitution) { if ("string" == typeof substitution) { var groups = _groups.get(this); return _super[Symbol.replace].call(this, str, substitution.replace(/\$<([^>]+)>/g, function (_, name) { return "$" + groups[name]; })); } if ("function" == typeof substitution) { var _this = this; return _super[Symbol.replace].call(this, str, function () { var args = arguments; return "object" != _typeof(args[args.length - 1]) && (args = [].slice.call(args)).push(buildGroups(args, _this)), substitution.apply(this, args); }); } return _super[Symbol.replace].call(this, str, substitution); }, _wrapRegExp.apply(this, arguments); }
@@ -96,7 +96,11 @@ function setupCore(G) {
         ping: "ping 1s cubic-bezier(0, 0, 0.2, 1) infinite",
         pulse: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         bounce: "bounce 1s infinite"
-      }
+      },
+      fontSizes: {},
+      // Font sizes to override
+      borderRadiusSizes: {} // Border radius sizes to override
+
     }
   };
   var $vs = G.$vs;
@@ -108,6 +112,10 @@ function setupCore(G) {
 
   function isArray(array) {
     return Array.isArray(array);
+  }
+
+  function isNumeric(n) {
+    return !isNaN(parseFloat(n)) && isFinite(n);
   }
 
   function isFunction(func) {
@@ -143,6 +151,7 @@ function setupCore(G) {
 
     var _loop = function _loop(i) {
       var source = i + 1 < 1 || _arguments.length <= i + 1 ? undefined : _arguments[i + 1];
+      if (!source) return "continue";
       Object.keys(source).forEach(function (key) {
         var desc = Object.getOwnPropertyDescriptor(source, key);
 
@@ -155,7 +164,9 @@ function setupCore(G) {
     };
 
     for (var i = 0; i < length; i++) {
-      _loop(i);
+      var _ret = _loop(i);
+
+      if (_ret === "continue") continue;
     }
 
     return target;
@@ -163,6 +174,7 @@ function setupCore(G) {
 
   $vs._ = {
     isString: isString,
+    isNumeric: isNumeric,
     isArray: isArray,
     isFunction: isFunction,
     isPlainObject: isPlainObject,
@@ -181,6 +193,7 @@ function setupCore(G) {
   var generators = $vs.generators = [];
   var cache = {};
   var knownAttributes = {};
+  var resetListeners = [];
   each(KNOWN_ATTR_NAMES.split(','), function (a) {
     return knownAttributes[a] = true;
   });
@@ -442,6 +455,9 @@ function setupCore(G) {
   }
 
   function resetStyles() {
+    each(resetListeners, function (callback) {
+      return callback();
+    });
     addedClasses = {};
     autoStyles = {};
     stylesOutput = null;
@@ -451,6 +467,11 @@ function setupCore(G) {
       styleElement.innerHTML = null;
       if (C.auto && G.document) resolveAll(G.document.body);
     }
+  }
+
+  function autoGenerateOnReset(callback) {
+    resetListeners.push(callback);
+    callback();
   }
 
   var CLASS_NAMES = /*#__PURE__*/_wrapRegExp(/class\s*=\s*['\"]([^'\"]*)['\"]/g, {
@@ -611,6 +632,7 @@ function setupCore(G) {
     generateSizes: generateSizes,
     resolveClass: resolveClass,
     addInitStyle: addInitStyle,
+    autoGenerateOnReset: autoGenerateOnReset,
     extractArbitraryValue: extractArbitraryValue
   });
   extend($vs, {
@@ -1132,11 +1154,12 @@ function setupLayout(G) {
 
 function setupPaint(G) {
   if (!G.$vs) return console.error('Vimesh style core is not loaded!');
-  var E = G.$vs._.each;
+  var _ = G.$vs._;
+  var E = _.each;
   var R = G.$vs.register;
-  var GS = G.$vs._.generateSizes;
-  var GC = G.$vs._.generateColors;
-  var EAV = G.$vs._.extractArbitraryValue;
+  var GS = _.generateSizes;
+  var GC = _.generateColors;
+  var EAV = _.extractArbitraryValue;
   var C = G.$vs.config;
   var P = C.prefix;
   var _G$$vs$_ = G.$vs._,
@@ -1152,23 +1175,34 @@ function setupPaint(G) {
     if (!font) return null;
     return "font-family: ".concat(font, ";");
   });
-  E({
-    xs: [0.75, 1],
-    sm: [0.875, 1.25],
-    base: [1, 1.5],
-    lg: [1.125, 1.75],
-    xl: [1.25, 1.75],
-    '2xl': [1.5, 2],
-    '3xl': [1.875, 2.25],
-    '4xl': [2.25, 2.5],
-    '5xl': [3],
-    '6xl': [3.75],
-    '7xl': [4.5],
-    '8xl': [6],
-    '9xl': [8]
-  }, function (v, k) {
-    return R("text-".concat(k), "font-size: ".concat(v[0], "rem;line-height: ").concat(v.length > 1 ? "".concat(v[1], "rem") : 1, ";"));
+
+  function sizeWithUnit(s) {
+    var defUnit = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'rem';
+    return _.isNumeric(s) ? "".concat(s).concat(defUnit) : s;
+  }
+
+  _.autoGenerateOnReset(function () {
+    var fontSizes = _.extend({
+      xs: [0.75, 1],
+      sm: [0.875, 1.25],
+      base: [1, 1.5],
+      lg: [1.125, 1.75],
+      xl: [1.25, 1.75],
+      '2xl': [1.5, 2],
+      '3xl': [1.875, 2.25],
+      '4xl': [2.25, 2.5],
+      '5xl': [3],
+      '6xl': [3.75],
+      '7xl': [4.5],
+      '8xl': [6],
+      '9xl': [8]
+    }, C.fontSizes);
+
+    E(fontSizes, function (v, k) {
+      return R("text-".concat(k), "font-size: ".concat(sizeWithUnit(v[0]), ";line-height: ").concat(v.length > 1 ? "".concat(sizeWithUnit(v[1])) : 1, ";"));
+    });
   });
+
   R("antialiased", "-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;");
   R("subpixel-antialiased", "-webkit-font-smoothing: auto; -moz-osx-font-smoothing: auto;");
   R("italic", "font-style: italic;");
@@ -1292,30 +1326,34 @@ function setupPaint(G) {
     return R("stroke-".concat(v), "stroke-width: ".concat(v));
   }); // Border
 
-  R("rounded-none", "border-radius: 0px;");
-  E({
-    none: '0px',
-    sm: 0.125,
-    _: 0.25,
-    md: 0.375,
-    lg: 0.5,
-    xl: 0.75,
-    '2xl': 1,
-    '3xl': 1.5,
-    full: '9999px'
-  }, function (s, n) {
-    s = isString(s) ? s : s + 'rem';
-    R("rounded".concat('_' == n ? '' : "-".concat(n)), "border-radius: ".concat(s, ";"));
-    E(dirs, function (v) {
-      if (v.length == 1) {
-        var isTB = 't' == v || 'b' == v;
-        var d2 = isTB ? ['l', 'r'] : ['t', 'b'];
-        R("rounded-".concat(v).concat('_' == n ? '' : "-".concat(n)), "border-".concat(isTB ? DM[v] : DM[d2[0]], "-").concat(isTB ? DM[d2[0]] : DM[v], "-radius: ").concat(s, "; border-").concat(isTB ? DM[v] : DM[d2[1]], "-").concat(isTB ? DM[d2[1]] : DM[v], "-radius: ").concat(s, ";"));
-      } else {
-        R("rounded-".concat(v).concat('_' == n ? '' : "-".concat(n)), "border-".concat(DM[v[0]], "-").concat(DM[v[1]], "-radius: ").concat(s, "; "));
-      }
+  _.autoGenerateOnReset(function () {
+    var borderRadiusSizes = _.extend({
+      none: '0px',
+      sm: 0.125,
+      _: 0.25,
+      md: 0.375,
+      lg: 0.5,
+      xl: 0.75,
+      '2xl': 1,
+      '3xl': 1.5,
+      full: '9999px'
+    }, C.borderRadiusSizes);
+
+    E(borderRadiusSizes, function (s, n) {
+      s = sizeWithUnit(s);
+      R("rounded".concat('_' == n ? '' : "-".concat(n)), "border-radius: ".concat(s, ";"));
+      E(dirs, function (v) {
+        if (v.length == 1) {
+          var isTB = 't' == v || 'b' == v;
+          var d2 = isTB ? ['l', 'r'] : ['t', 'b'];
+          R("rounded-".concat(v).concat('_' == n ? '' : "-".concat(n)), "border-".concat(isTB ? DM[v] : DM[d2[0]], "-").concat(isTB ? DM[d2[0]] : DM[v], "-radius: ").concat(s, "; border-").concat(isTB ? DM[v] : DM[d2[1]], "-").concat(isTB ? DM[d2[1]] : DM[v], "-radius: ").concat(s, ";"));
+        } else {
+          R("rounded-".concat(v).concat('_' == n ? '' : "-".concat(n)), "border-".concat(DM[v[0]], "-").concat(DM[v[1]], "-radius: ").concat(s, "; "));
+        }
+      });
     });
   });
+
   R("rounded-[", function (classDetails) {
     return "border-radius: ".concat(EAV(classDetails.name), ";");
   });

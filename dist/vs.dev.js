@@ -1,4 +1,4 @@
-// Vimesh Style v1.0.0
+// Vimesh Style v1.0.1
 
 function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
@@ -65,7 +65,9 @@ function setupCore(G) {
                 ping: `ping 1s cubic-bezier(0, 0, 0.2, 1) infinite`,
                 pulse: `pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite`,
                 bounce: `bounce 1s infinite`
-            }
+            },
+            fontSizes: {}, // Font sizes to override
+            borderRadiusSizes : {} // Border radius sizes to override
         }
     }
 
@@ -77,6 +79,9 @@ function setupCore(G) {
     }
     function isArray(array) {
         return Array.isArray(array)
+    }
+    function isNumeric(n) {
+        return !isNaN(parseFloat(n)) && isFinite(n);
     }
     function isFunction(func) {
         return typeof func === "function";
@@ -101,6 +106,7 @@ function setupCore(G) {
         if (length < 1 || target == null) return target
         for (let i = 0; i < length; i++) {
             const source = sources[i]
+            if (!source) continue
             Object.keys(source).forEach((key) => {
                 var desc = Object.getOwnPropertyDescriptor(source, key)
                 if (desc.get || desc.set) {
@@ -112,7 +118,7 @@ function setupCore(G) {
         }
         return target
     }
-    $vs._ = { isString, isArray, isFunction, isPlainObject, each, extend }
+    $vs._ = { isString, isNumeric, isArray, isFunction, isPlainObject, each, extend }
 
     const KNOWN_ATTR_NAMES = 'font,text,underline,list,bg,gradient,border,divide,ring,icon,container,p,m,space,w,min-w,max-w,h,min-h,max-h,flex,grid,table,order,align,justify,place,display,pos,box,caret,isolation,object,overflow,overscroll,z,shadow,opacity,blend,filter,backdrop,transition,animate,transform,appearance,cursor,outline,pointer,resize,select,sr'
     let addedClasses = {}
@@ -126,6 +132,7 @@ function setupCore(G) {
     let generators = $vs.generators = []
     let cache = {}
     let knownAttributes = {}
+    let resetListeners = []
     each(KNOWN_ATTR_NAMES.split(','), a => knownAttributes[a] = true)
 
     function decomposeClassName(className) {
@@ -179,7 +186,7 @@ function setupCore(G) {
         if (!style && C.debug) console.log(`Unknown class: ${className}`)
         return style
     }
-    function addMacroCss(css){
+    function addMacroCss(css) {
         if (isPlainObject(css))
             macroCss.push(css)
         else if (isArray(css))
@@ -335,6 +342,7 @@ function setupCore(G) {
         addClasses(allClasses, update)
     }
     function resetStyles() {
+        each(resetListeners, callback => callback())
         addedClasses = {}
         autoStyles = {}
         stylesOutput = null
@@ -343,6 +351,10 @@ function setupCore(G) {
             styleElement.innerHTML = null
             if (C.auto && G.document) resolveAll(G.document.body)
         }
+    }
+    function autoGenerateOnReset(callback) {
+        resetListeners.push(callback)
+        callback()
     }
     const CLASS_NAMES = /class\s*=\s*['\"](?<class>[^'\"]*)['\"]/g
     function extractClasses(html) {
@@ -466,6 +478,7 @@ function setupCore(G) {
         generateSizes,
         resolveClass,
         addInitStyle,
+        autoGenerateOnReset,
         extractArbitraryValue
     })
     extend($vs, {
@@ -831,11 +844,12 @@ function setupLayout(G) {
 
 function setupPaint(G) {
     if (!G.$vs) return console.error('Vimesh style core is not loaded!')
-    const E = G.$vs._.each
+    const _ = G.$vs._
+    const E = _.each
     const R = G.$vs.register
-    const GS = G.$vs._.generateSizes
-    const GC = G.$vs._.generateColors
-    const EAV = G.$vs._.extractArbitraryValue
+    const GS = _.generateSizes
+    const GC = _.generateColors
+    const EAV = _.extractArbitraryValue
     const C = G.$vs.config
     const P = C.prefix
     const { rgbToHex, resolveColor, addInitStyle, isString } = G.$vs._
@@ -848,11 +862,16 @@ function setupPaint(G) {
         if (!font) return null
         return `font-family: ${font};`
     })
-
-    E({
-        xs: [0.75, 1], sm: [0.875, 1.25], base: [1, 1.5], lg: [1.125, 1.75], xl: [1.25, 1.75],
-        '2xl': [1.5, 2], '3xl': [1.875, 2.25], '4xl': [2.25, 2.5], '5xl': [3], '6xl': [3.75], '7xl': [4.5], '8xl': [6], '9xl': [8]
-    }, (v, k) => R(`text-${k}`, `font-size: ${v[0]}rem;line-height: ${v.length > 1 ? `${v[1]}rem` : 1};`))
+    function sizeWithUnit(s, defUnit = 'rem') {
+        return _.isNumeric(s) ? `${s}${defUnit}` : s
+    }
+    _.autoGenerateOnReset(() => {
+        const fontSizes = _.extend({
+            xs: [0.75, 1], sm: [0.875, 1.25], base: [1, 1.5], lg: [1.125, 1.75], xl: [1.25, 1.75],
+            '2xl': [1.5, 2], '3xl': [1.875, 2.25], '4xl': [2.25, 2.5], '5xl': [3], '6xl': [3.75], '7xl': [4.5], '8xl': [6], '9xl': [8]
+        }, C.fontSizes)
+        E(fontSizes, (v, k) => R(`text-${k}`, `font-size: ${sizeWithUnit(v[0])};line-height: ${v.length > 1 ? `${sizeWithUnit(v[1])}` : 1};`))
+    })
 
     R(`antialiased`, `-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;`)
     R(`subpixel-antialiased`, `-webkit-font-smoothing: auto; -moz-osx-font-smoothing: auto;`)
@@ -925,18 +944,20 @@ function setupPaint(G) {
     E([0, 1, 2], v => R(`stroke-${v}`, `stroke-width: ${v}`))
 
     // Border
-    R(`rounded-none`, `border-radius: 0px;`)
-    E({ none: '0px', sm: 0.125, _: 0.25, md: 0.375, lg: 0.5, xl: 0.75, '2xl': 1, '3xl': 1.5, full: '9999px' }, (s, n) => {
-        s = isString(s) ? s : s + 'rem'
-        R(`rounded${'_' == n ? '' : `-${n}`}`, `border-radius: ${s};`)
-        E(dirs, v => {
-            if (v.length == 1) {
-                let isTB = 't' == v || 'b' == v
-                let d2 = isTB ? ['l', 'r'] : ['t', 'b']
-                R(`rounded-${v}${'_' == n ? '' : `-${n}`}`, `border-${isTB ? DM[v] : DM[d2[0]]}-${isTB ? DM[d2[0]] : DM[v]}-radius: ${s}; border-${isTB ? DM[v] : DM[d2[1]]}-${isTB ? DM[d2[1]] : DM[v]}-radius: ${s};`)
-            } else {
-                R(`rounded-${v}${'_' == n ? '' : `-${n}`}`, `border-${DM[v[0]]}-${DM[v[1]]}-radius: ${s}; `)
-            }
+    _.autoGenerateOnReset(() => {
+        const borderRadiusSizes = _.extend({ none: '0px', sm: 0.125, _: 0.25, md: 0.375, lg: 0.5, xl: 0.75, '2xl': 1, '3xl': 1.5, full: '9999px' }, C.borderRadiusSizes)
+        E(borderRadiusSizes, (s, n) => {
+            s = sizeWithUnit(s)
+            R(`rounded${'_' == n ? '' : `-${n}`}`, `border-radius: ${s};`)
+            E(dirs, v => {
+                if (v.length == 1) {
+                    let isTB = 't' == v || 'b' == v
+                    let d2 = isTB ? ['l', 'r'] : ['t', 'b']
+                    R(`rounded-${v}${'_' == n ? '' : `-${n}`}`, `border-${isTB ? DM[v] : DM[d2[0]]}-${isTB ? DM[d2[0]] : DM[v]}-radius: ${s}; border-${isTB ? DM[v] : DM[d2[1]]}-${isTB ? DM[d2[1]] : DM[v]}-radius: ${s};`)
+                } else {
+                    R(`rounded-${v}${'_' == n ? '' : `-${n}`}`, `border-${DM[v[0]]}-${DM[v[1]]}-radius: ${s}; `)
+                }
+            })
         })
     })
     R(`rounded-[`, (classDetails) => `border-radius: ${EAV(classDetails.name)};`)
