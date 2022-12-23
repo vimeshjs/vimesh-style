@@ -96,8 +96,8 @@ function setupPaint(G) {
     })
 
     // SVG
-    R(`fill-current`, `fill: currentColor;`)
-    R(`stroke-current`, `stroke: currentColor;`)
+    GC('fill', 'fill')
+    GC('stroke', 'stroke')
     E([0, 1, 2], v => R(`stroke-${v}`, `stroke-width: ${v}`))
 
     // Border
