@@ -1,4 +1,4 @@
-// Vimesh Style v1.0.3
+// Vimesh Style v1.0.4
 
 function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
@@ -782,7 +782,7 @@ function setupLayout(G) {
     for (i = 1; i <= 12; i++) R(`grid-cols-${i}`, `grid-template-columns: repeat(${i}, minmax(0, 1fr));`)
 
     R(`grid-cols-[`, classDetails => {
-        let items = EAV(classDetails.name).replace(/,/g, ' ')
+        let items = EAV(classDetails.name).replace(/,(?![^\(]*\))/g, ' ')
         return `grid-template-columns: ${items};`
     })
     const extractLastNum = n => n.substring(n.lastIndexOf('-') + 1)
@@ -804,7 +804,7 @@ function setupLayout(G) {
     for (i = 1; i <= 6; i++) R(`grid-rows-${i}`, `grid-template-rows: repeat(${i}, minmax(0, 1fr));`)
 
     R(`grid-rows-[`, classDetails => {
-        let items = EAV(classDetails.name).replace(/,/g, ' ')
+        let items = EAV(classDetails.name).replace(/,(?![^\(]*\))/g, ' ')
         return `grid-template-rows: ${items};`
     })
 
