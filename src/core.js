@@ -6,7 +6,7 @@ function setupCore(G) {
             debug: false,
             auto: true,
             prefix: 'vs',
-            attributify: 'all', // all, none, prefix
+            attributify: 'none', // all, none, prefix
             breakpoints: {
                 sm: 640,
                 md: 768,
@@ -66,7 +66,7 @@ function setupCore(G) {
                 bounce: `bounce 1s infinite`
             },
             fontSizes: {}, // Font sizes to override
-            borderRadiusSizes : {} // Border radius sizes to override
+            borderRadiusSizes: {} // Border radius sizes to override
         }
     }
 
@@ -154,9 +154,45 @@ function setupCore(G) {
             console.error(`Wrong parameter ${className}`)
         }
     }
-    function normalizeCssName(name) {
-        return name.replace(/:/g, '\\:').replace(/\//g, '\\/').replace(/\./g, '\\.')
-            .replace(/\[/g, '\\[').replace(/\]/g, '\\]').replace(/\#/g, '\\#').replace(/\%/g, '\\%')
+    function normalizeCssName(value) {
+        var string = String(value)
+        var length = string.length
+        var index = -1
+        var codeUnit
+        var result = ''
+        var firstCodeUnit = string.charCodeAt(0)
+
+        if (length == 1 && firstCodeUnit == 0x002D) {
+            return '\\' + string
+        }
+
+        while (++index < length) {
+            codeUnit = string.charCodeAt(index);
+            if (codeUnit == 0x0000) {
+                result += '\uFFFD'
+                continue
+            }
+
+            if ((codeUnit >= 0x0001 && codeUnit <= 0x001F) || codeUnit == 0x007F ||
+                (index == 0 && codeUnit >= 0x0030 && codeUnit <= 0x0039) ||
+                (index == 1 && codeUnit >= 0x0030 && codeUnit <= 0x0039 && firstCodeUnit == 0x002D)) {
+                result += '\\' + codeUnit.toString(16) + ' '
+                continue
+            }
+            if (
+                codeUnit >= 0x0080 ||
+                codeUnit == 0x002D ||
+                codeUnit == 0x005F ||
+                codeUnit >= 0x0030 && codeUnit <= 0x0039 ||
+                codeUnit >= 0x0041 && codeUnit <= 0x005A ||
+                codeUnit >= 0x0061 && codeUnit <= 0x007A
+            ) {
+                result += string.charAt(index)
+                continue
+            }
+            result += '\\' + string.charAt(index)
+        }
+        return result
     }
     function register(keys, generatorOrStyle, initFunc) {
         if (!generatorOrStyle) return
@@ -232,6 +268,7 @@ function setupCore(G) {
                 classes = all
             }
             each(classes, name => {
+                name = name.trim()
                 if (!name || addedClasses[name]) return
                 let style = resolveClass(name)
                 if (style) {

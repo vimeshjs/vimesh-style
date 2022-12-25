@@ -1,4 +1,4 @@
-// Vimesh Style v1.0.2
+// Vimesh Style v1.0.3
 
 function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
@@ -7,7 +7,7 @@ function setupCore(G) {
             debug: false,
             auto: true,
             prefix: 'vs',
-            attributify: 'all', // all, none, prefix
+            attributify: 'none', // all, none, prefix
             breakpoints: {
                 sm: 640,
                 md: 768,
@@ -67,7 +67,7 @@ function setupCore(G) {
                 bounce: `bounce 1s infinite`
             },
             fontSizes: {}, // Font sizes to override
-            borderRadiusSizes : {} // Border radius sizes to override
+            borderRadiusSizes: {} // Border radius sizes to override
         }
     }
 
@@ -155,9 +155,45 @@ function setupCore(G) {
             console.error(`Wrong parameter ${className}`)
         }
     }
-    function normalizeCssName(name) {
-        return name.replace(/:/g, '\\:').replace(/\//g, '\\/').replace(/\./g, '\\.')
-            .replace(/\[/g, '\\[').replace(/\]/g, '\\]').replace(/\#/g, '\\#').replace(/\%/g, '\\%')
+    function normalizeCssName(value) {
+        var string = String(value)
+        var length = string.length
+        var index = -1
+        var codeUnit
+        var result = ''
+        var firstCodeUnit = string.charCodeAt(0)
+
+        if (length == 1 && firstCodeUnit == 0x002D) {
+            return '\\' + string
+        }
+
+        while (++index < length) {
+            codeUnit = string.charCodeAt(index);
+            if (codeUnit == 0x0000) {
+                result += '\uFFFD'
+                continue
+            }
+
+            if ((codeUnit >= 0x0001 && codeUnit <= 0x001F) || codeUnit == 0x007F ||
+                (index == 0 && codeUnit >= 0x0030 && codeUnit <= 0x0039) ||
+                (index == 1 && codeUnit >= 0x0030 && codeUnit <= 0x0039 && firstCodeUnit == 0x002D)) {
+                result += '\\' + codeUnit.toString(16) + ' '
+                continue
+            }
+            if (
+                codeUnit >= 0x0080 ||
+                codeUnit == 0x002D ||
+                codeUnit == 0x005F ||
+                codeUnit >= 0x0030 && codeUnit <= 0x0039 ||
+                codeUnit >= 0x0041 && codeUnit <= 0x005A ||
+                codeUnit >= 0x0061 && codeUnit <= 0x007A
+            ) {
+                result += string.charAt(index)
+                continue
+            }
+            result += '\\' + string.charAt(index)
+        }
+        return result
     }
     function register(keys, generatorOrStyle, initFunc) {
         if (!generatorOrStyle) return
@@ -233,6 +269,7 @@ function setupCore(G) {
                 classes = all
             }
             each(classes, name => {
+                name = name.trim()
                 if (!name || addedClasses[name]) return
                 let style = resolveClass(name)
                 if (style) {
@@ -744,21 +781,32 @@ function setupLayout(G) {
     R(`grid-cols-none`, `grid-template-columns: none;`)
     for (i = 1; i <= 12; i++) R(`grid-cols-${i}`, `grid-template-columns: repeat(${i}, minmax(0, 1fr));`)
 
+    R(`grid-cols-[`, classDetails => {
+        let items = EAV(classDetails.name).replace(/,/g, ' ')
+        return `grid-template-columns: ${items};`
+    })
+    const extractLastNum = n => n.substring(n.lastIndexOf('-') + 1)
     E([['col', 'column'], ['row', 'row']], ([n1, n2], row) => {
         R(`${n1}-auto`, `grid-${n2}: auto;`)
         R(`${n1}-span-full`, `grid-${n2}: 1 / -1;`)
         R(`${n1}-start-auto`, `grid-${n2}-start: auto;`)
         R(`${n1}-end-auto`, `grid-${n2}-end: auto;`)
-        let len = (row ? 7 : 13)
-        for (i = 1; i <= len; i++) {
-            R(`${n1}-span-${i}`, `grid-${n2}: span ${i} / span ${i};`)
-            R(`${n1}-start-${i}`, `grid-${n2}-start: span ${i} / span ${i};`)
-            R(`${n1}-end-${i}`, `grid-${n2}-end: span ${i} / span ${i};`)
-        }
+
+        R(`${n1}-span-`, classDetails => {
+            let i = extractLastNum(classDetails.name)
+            return `grid-${n2}: span ${i} / span ${i};`
+        })
+        R(`${n1}-start-`, classDetails => `grid-${n2}-start: ${extractLastNum(classDetails.name)};`)
+        R(`${n1}-end-`, classDetails => `grid-${n2}-end: ${extractLastNum(classDetails.name)};`)
     })
 
     R(`grid-rows-none`, `grid-template-rows: none;`)
     for (i = 1; i <= 6; i++) R(`grid-rows-${i}`, `grid-template-rows: repeat(${i}, minmax(0, 1fr));`)
+
+    R(`grid-rows-[`, classDetails => {
+        let items = EAV(classDetails.name).replace(/,/g, ' ')
+        return `grid-template-rows: ${items};`
+    })
 
     E(['row', 'col', 'dense', 'row-dense', 'col-dense'], v => R(`grid-flow-${v}`, `grid-auto-flow: ${v.replace('col', 'column')};`))
     E({ auto: 'auto', min: 'min-content', max: 'max-content', fr: 'minmax(0, 1fr)' }, (v, k) => {

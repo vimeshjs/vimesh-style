@@ -1,4 +1,4 @@
-// Vimesh Style (ES5) v1.0.2
+// Vimesh Style (ES5) v1.0.3
 "use strict";
 
 function _wrapRegExp() { _wrapRegExp = function _wrapRegExp(re, groups) { return new BabelRegExp(re, void 0, groups); }; var _super = RegExp.prototype, _groups = new WeakMap(); function BabelRegExp(re, flags, groups) { var _this = new RegExp(re, flags); return _groups.set(_this, groups || _groups.get(re)), _setPrototypeOf(_this, BabelRegExp.prototype); } function buildGroups(result, re) { var g = _groups.get(re); return Object.keys(g).reduce(function (groups, name) { return groups[name] = result[g[name]], groups; }, Object.create(null)); } return _inherits(BabelRegExp, RegExp), BabelRegExp.prototype.exec = function (str) { var result = _super.exec.call(this, str); return result && (result.groups = buildGroups(result, this)), result; }, BabelRegExp.prototype[Symbol.replace] = function (str, substitution) { if ("string" == typeof substitution) { var groups = _groups.get(this); return _super[Symbol.replace].call(this, str, substitution.replace(/\$<([^>]+)>/g, function (_, name) { return "$" + groups[name]; })); } if ("function" == typeof substitution) { var _this = this; return _super[Symbol.replace].call(this, str, function () { var args = arguments; return "object" != _typeof(args[args.length - 1]) && (args = [].slice.call(args)).push(buildGroups(args, _this)), substitution.apply(this, args); }); } return _super[Symbol.replace].call(this, str, substitution); }, _wrapRegExp.apply(this, arguments); }
@@ -37,7 +37,7 @@ function setupCore(G) {
       debug: false,
       auto: true,
       prefix: 'vs',
-      attributify: 'all',
+      attributify: 'none',
       // all, none, prefix
       breakpoints: {
         sm: 640,
@@ -222,8 +222,40 @@ function setupCore(G) {
     }
   }
 
-  function normalizeCssName(name) {
-    return name.replace(/:/g, '\\:').replace(/\//g, '\\/').replace(/\./g, '\\.').replace(/\[/g, '\\[').replace(/\]/g, '\\]').replace(/\#/g, '\\#').replace(/\%/g, '\\%');
+  function normalizeCssName(value) {
+    var string = String(value);
+    var length = string.length;
+    var index = -1;
+    var codeUnit;
+    var result = '';
+    var firstCodeUnit = string.charCodeAt(0);
+
+    if (length == 1 && firstCodeUnit == 0x002D) {
+      return '\\' + string;
+    }
+
+    while (++index < length) {
+      codeUnit = string.charCodeAt(index);
+
+      if (codeUnit == 0x0000) {
+        result += "\uFFFD";
+        continue;
+      }
+
+      if (codeUnit >= 0x0001 && codeUnit <= 0x001F || codeUnit == 0x007F || index == 0 && codeUnit >= 0x0030 && codeUnit <= 0x0039 || index == 1 && codeUnit >= 0x0030 && codeUnit <= 0x0039 && firstCodeUnit == 0x002D) {
+        result += '\\' + codeUnit.toString(16) + ' ';
+        continue;
+      }
+
+      if (codeUnit >= 0x0080 || codeUnit == 0x002D || codeUnit == 0x005F || codeUnit >= 0x0030 && codeUnit <= 0x0039 || codeUnit >= 0x0041 && codeUnit <= 0x005A || codeUnit >= 0x0061 && codeUnit <= 0x007A) {
+        result += string.charAt(index);
+        continue;
+      }
+
+      result += '\\' + string.charAt(index);
+    }
+
+    return result;
   }
 
   function register(keys, generatorOrStyle, initFunc) {
@@ -315,6 +347,7 @@ function setupCore(G) {
         classes = all;
       }
       each(classes, function (name) {
+        name = name.trim();
         if (!name || addedClasses[name]) return;
         var style = resolveClass(name);
 
@@ -1020,6 +1053,15 @@ function setupLayout(G) {
     R("grid-cols-".concat(i), "grid-template-columns: repeat(".concat(i, ", minmax(0, 1fr));"));
   }
 
+  R("grid-cols-[", function (classDetails) {
+    var items = EAV(classDetails.name).replace(/,/g, ' ');
+    return "grid-template-columns: ".concat(items, ";");
+  });
+
+  var extractLastNum = function extractLastNum(n) {
+    return n.substring(n.lastIndexOf('-') + 1);
+  };
+
   E([['col', 'column'], ['row', 'row']], function (_ref, row) {
     var _ref2 = _slicedToArray(_ref, 2),
         n1 = _ref2[0],
@@ -1029,13 +1071,16 @@ function setupLayout(G) {
     R("".concat(n1, "-span-full"), "grid-".concat(n2, ": 1 / -1;"));
     R("".concat(n1, "-start-auto"), "grid-".concat(n2, "-start: auto;"));
     R("".concat(n1, "-end-auto"), "grid-".concat(n2, "-end: auto;"));
-    var len = row ? 7 : 13;
-
-    for (i = 1; i <= len; i++) {
-      R("".concat(n1, "-span-").concat(i), "grid-".concat(n2, ": span ").concat(i, " / span ").concat(i, ";"));
-      R("".concat(n1, "-start-").concat(i), "grid-".concat(n2, "-start: span ").concat(i, " / span ").concat(i, ";"));
-      R("".concat(n1, "-end-").concat(i), "grid-".concat(n2, "-end: span ").concat(i, " / span ").concat(i, ";"));
-    }
+    R("".concat(n1, "-span-"), function (classDetails) {
+      var i = extractLastNum(classDetails.name);
+      return "grid-".concat(n2, ": span ").concat(i, " / span ").concat(i, ";");
+    });
+    R("".concat(n1, "-start-"), function (classDetails) {
+      return "grid-".concat(n2, "-start: ").concat(extractLastNum(classDetails.name), ";");
+    });
+    R("".concat(n1, "-end-"), function (classDetails) {
+      return "grid-".concat(n2, "-end: ").concat(extractLastNum(classDetails.name), ";");
+    });
   });
   R("grid-rows-none", "grid-template-rows: none;");
 
@@ -1043,6 +1088,10 @@ function setupLayout(G) {
     R("grid-rows-".concat(i), "grid-template-rows: repeat(".concat(i, ", minmax(0, 1fr));"));
   }
 
+  R("grid-rows-[", function (classDetails) {
+    var items = EAV(classDetails.name).replace(/,/g, ' ');
+    return "grid-template-rows: ".concat(items, ";");
+  });
   E(['row', 'col', 'dense', 'row-dense', 'col-dense'], function (v) {
     return R("grid-flow-".concat(v), "grid-auto-flow: ".concat(v.replace('col', 'column'), ";"));
   });

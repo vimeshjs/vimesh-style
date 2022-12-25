@@ -205,21 +205,32 @@ function setupLayout(G) {
     R(`grid-cols-none`, `grid-template-columns: none;`)
     for (i = 1; i <= 12; i++) R(`grid-cols-${i}`, `grid-template-columns: repeat(${i}, minmax(0, 1fr));`)
 
+    R(`grid-cols-[`, classDetails => {
+        let items = EAV(classDetails.name).replace(/,/g, ' ')
+        return `grid-template-columns: ${items};`
+    })
+    const extractLastNum = n => n.substring(n.lastIndexOf('-') + 1)
     E([['col', 'column'], ['row', 'row']], ([n1, n2], row) => {
         R(`${n1}-auto`, `grid-${n2}: auto;`)
         R(`${n1}-span-full`, `grid-${n2}: 1 / -1;`)
         R(`${n1}-start-auto`, `grid-${n2}-start: auto;`)
         R(`${n1}-end-auto`, `grid-${n2}-end: auto;`)
-        let len = (row ? 7 : 13)
-        for (i = 1; i <= len; i++) {
-            R(`${n1}-span-${i}`, `grid-${n2}: span ${i} / span ${i};`)
-            R(`${n1}-start-${i}`, `grid-${n2}-start: span ${i} / span ${i};`)
-            R(`${n1}-end-${i}`, `grid-${n2}-end: span ${i} / span ${i};`)
-        }
+
+        R(`${n1}-span-`, classDetails => {
+            let i = extractLastNum(classDetails.name)
+            return `grid-${n2}: span ${i} / span ${i};`
+        })
+        R(`${n1}-start-`, classDetails => `grid-${n2}-start: ${extractLastNum(classDetails.name)};`)
+        R(`${n1}-end-`, classDetails => `grid-${n2}-end: ${extractLastNum(classDetails.name)};`)
     })
 
     R(`grid-rows-none`, `grid-template-rows: none;`)
     for (i = 1; i <= 6; i++) R(`grid-rows-${i}`, `grid-template-rows: repeat(${i}, minmax(0, 1fr));`)
+
+    R(`grid-rows-[`, classDetails => {
+        let items = EAV(classDetails.name).replace(/,/g, ' ')
+        return `grid-template-rows: ${items};`
+    })
 
     E(['row', 'col', 'dense', 'row-dense', 'col-dense'], v => R(`grid-flow-${v}`, `grid-auto-flow: ${v.replace('col', 'column')};`))
     E({ auto: 'auto', min: 'min-content', max: 'max-content', fr: 'minmax(0, 1fr)' }, (v, k) => {
