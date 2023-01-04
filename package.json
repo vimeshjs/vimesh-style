@@ -1,7 +1,7 @@
 {
   "name": "@vimesh/style",
   "description": "Full-featured tiny javascript library alternative to Tailwind CSS 2.0. Automatically work with any frontend frameworks, including React, Vue, AngularJS ect.",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "repository": "https://github.com/vimeshjs/vimesh-style.git",
   "author": "Jacky ZHANG <xinjie.zhang@gmail.com>",
   "license": "MIT",

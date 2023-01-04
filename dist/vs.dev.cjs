@@ -1,4 +1,4 @@
-// Vimesh Style v1.0.4
+// Vimesh Style v1.0.5
 
 function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
@@ -1107,6 +1107,7 @@ function setupPaint(G) {
     // Transform
     const initTransform = () => addInitStyle(`*, ::before, ::after {--${P}-translate-x: 0; --${P}-translate-y: 0; --${P}-rotate: 0; --${P}-skew-x: 0; --${P}-skew-y: 0; --${P}-scale-x: 1; --${P}-scale-y: 1;}`)
     const transform = `transform: translateX(var(--${P}-translate-x)) translateY(var(--${P}-translate-y)) rotate(var(--${P}-rotate)) skewX(var(--${P}-skew-x)) skewY(var(--${P}-skew-y)) scaleX(var(--${P}-scale-x)) scaleY(var(--${P}-scale-y))`
+    R(`transform`, `${transform};`, initTransform)
     R(`transform-none`, `transform: none;`)
     E(['center', 'top', 'top-right', 'right', 'bottom-right', 'bottom', 'bottom-left', 'left', 'top-left'], v => R(`origin-${v}`, `transform-origin: ${v.replace('-', ' ')};`))
     R(['scale-', '-scale-'], classDetails => {
