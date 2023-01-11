@@ -12,6 +12,7 @@ function setupPaint(G) {
     const { rgbToHex, resolveColor, addInitStyle, isString } = G.$vs._
     let i
 
+    addInitStyle(`*, ::before, ::after {--${P}-content: '';}`)
     // Font
     R('font-', classDetails => {
         let parts = classDetails.name.split('-')
@@ -268,6 +269,8 @@ function setupPaint(G) {
             return `${transform}; --${P}-skew-${a}: ${s}${value};`
         }, initTransform)
     }))
+    // Content
+    R(`content-[`, (classDetails) => `--${P}-content: ${EAV(classDetails.name)};content: var(--${P}-content);`)
 
     // Outline 
     R(`outline-none`, `outline: 2px solid transparent; outline-offset: 2px;`)

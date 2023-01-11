@@ -1,4 +1,4 @@
-// Vimesh Style (ES5) v1.0.5
+// Vimesh Style (ES5) v1.1.0
 "use strict";
 
 function _wrapRegExp() { _wrapRegExp = function _wrapRegExp(re, groups) { return new BabelRegExp(re, void 0, groups); }; var _super = RegExp.prototype, _groups = new WeakMap(); function BabelRegExp(re, flags, groups) { var _this = new RegExp(re, flags); return _groups.set(_this, groups || _groups.get(re)), _setPrototypeOf(_this, BabelRegExp.prototype); } function buildGroups(result, re) { var g = _groups.get(re); return Object.keys(g).reduce(function (groups, name) { return groups[name] = result[g[name]], groups; }, Object.create(null)); } return _inherits(BabelRegExp, RegExp), BabelRegExp.prototype.exec = function (str) { var result = _super.exec.call(this, str); return result && (result.groups = buildGroups(result, this)), result; }, BabelRegExp.prototype[Symbol.replace] = function (str, substitution) { if ("string" == typeof substitution) { var groups = _groups.get(this); return _super[Symbol.replace].call(this, str, substitution.replace(/\$<([^>]+)>/g, function (_, name) { return "$" + groups[name]; })); } if ("function" == typeof substitution) { var _this = this; return _super[Symbol.replace].call(this, str, function () { var args = arguments; return "object" != _typeof(args[args.length - 1]) && (args = [].slice.call(args)).push(buildGroups(args, _this)), substitution.apply(this, args); }); } return _super[Symbol.replace].call(this, str, substitution); }, _wrapRegExp.apply(this, arguments); }
@@ -192,31 +192,195 @@ function setupCore(G) {
   var stylesOutput = null;
   var generators = $vs.generators = [];
   var cache = {};
+  var cacheDecompose = {};
   var knownAttributes = {};
   var resetListeners = [];
   each(KNOWN_ATTR_NAMES.split(','), function (a) {
     return knownAttributes[a] = true;
   });
+  var BP_MIN_TPL = "@media (min-width: ${width}) {\n  ${style} \n}";
+  var BP_MAX_TPL = "@media not all and (min-width: ${width}) {\n  ${style} \n}";
+  var KNOWN_MEDIAS = {
+    dark: '@media (prefers-color-scheme: dark)',
+    portrait: '@media (orientation: portrait)',
+    landscape: '@media (orientation: landscape)',
+    'motion-safe': '@media (prefers-reduced-motion: no-preference)',
+    'motion-reduce': '@media (prefers-reduced-motion: reduce)',
+    'contrast-more': '@media (prefers-contrast: more)',
+    'contrast-less': '@media (prefers-contrast: less)',
+    print: '@media print'
+  };
+  var KNOWN_PE = {
+    before: 1,
+    after: 1,
+    'first-letter': 1,
+    'first-line': 1,
+    marker: 1,
+    selection: 1,
+    file: 'file-selector-button',
+    backdrop: 1,
+    placeholder: 1
+  };
+  var KNOWN_PC = {
+    hover: 1,
+    focus: 1,
+    'focus-within': 1,
+    'focus-visible': 1,
+    active: 1,
+    visited: 1,
+    target: 1,
+    first: 'first-child',
+    last: 'last-child',
+    only: 'only-child',
+    odd: 'nth-child(odd)',
+    even: 'nth-child(even)',
+    'first-of-type': 1,
+    'last-of-type': 1,
+    'only-of-type': 1,
+    empty: 1,
+    disabled: 1,
+    enabled: 1,
+    checked: 1,
+    indeterminate: 1,
+    "default": 1,
+    required: 1,
+    valid: 1,
+    invalid: 1,
+    'in-range': 1,
+    'out-of-range': 1,
+    'placeholder-shown': 1,
+    autofill: 1,
+    'read-only': 1
+  };
 
-  function decomposeClassName(className) {
+  function expandModifier(name, m) {
+    if (!m) return name;
+    if (m == 'rtl' || m == 'ltr') return "[dir=\"".concat(m, "\"] ").concat(name);
+
+    if (KNOWN_PC[m]) {
+      return "".concat(name, ":").concat(KNOWN_PC[m] === 1 ? m : KNOWN_PC[m]);
+    } else if (KNOWN_PE[m]) {
+      return "".concat(name, "::").concat(KNOWN_PE[m] === 1 ? m : KNOWN_PE[m]);
+    } else if (m.startsWith('aria-')) {
+      if (m.startsWith('aria-[')) {
+        var av = extractArbitraryValue(m);
+        return "".concat(name, "[aria-").concat(av, "]");
+      } else {
+        return "".concat(name, "[aria-").concat(m.substring(5), "=\"true\"]");
+      }
+    } else if (m.startsWith('data-[')) {
+      var _av = extractArbitraryValue(m);
+
+      return "".concat(name, "[data-").concat(_av, "]");
+    } else if (m == 'open') {
+      return "".concat(name, "[open]");
+    }
+
+    return name;
+  }
+
+  function decomposeClassName(className, surfix) {
     if (isString(className)) {
+      var bps = C.breakpoints;
+      var key = className + '`' + (surfix || '');
+      if (cacheDecompose[key]) return cacheDecompose[key];
+      var fullname = '.' + normalizeCssName(className) + (surfix || '');
       var breakpoint = null;
       var pseudo = null;
-      var segs = className.split(':');
+      var dark = className.startsWith('dark:');
+      if (dark) className = className.substring(5);
+      var segs = className.replace(/:(?=(((?!\]).)*\[)|[^\[\]]*$)/g, '\n').split('\n');
+      var template = '${style}';
+
+      var addDark = function addDark(name) {
+        return dark ? '.dark ' + name : name;
+      };
+
+      var addContent = function addContent(p) {
+        return p === 'before' || p === 'after' ? "content: var(--".concat(C.prefix, "-content);") : '';
+      };
+
       className = segs[segs.length - 1];
 
       if (segs.length === 3) {
         breakpoint = segs[0];
         pseudo = segs[1];
       } else if (segs.length === 2) {
-        if (C.breakpoints[segs[0]]) breakpoint = segs[0];else pseudo = segs[0];
+        if (KNOWN_MEDIAS[segs[0]] || bps[segs[0]] || segs[0].startsWith('min-') || segs[0].startsWith('max-')) breakpoint = segs[0];else pseudo = segs[0];
       }
 
-      return {
+      if (breakpoint) {
+        if (KNOWN_MEDIAS[breakpoint]) {
+          template = KNOWN_MEDIAS[breakpoint] + " {\n  ${style} \n}";
+        } else if (bps[breakpoint]) {
+          template = BP_MIN_TPL.replace('${width}', "".concat(bps[breakpoint], "px"));
+        } else if (breakpoint.startsWith('min-[')) {
+          template = BP_MIN_TPL.replace('${width}', extractArbitraryValue(breakpoint));
+        } else if (breakpoint.startsWith('max-[')) {
+          template = "@media (max-width: " + extractArbitraryValue(breakpoint) + ") {\n  ${style} \n}";
+        } else if (breakpoint.startsWith('max-')) {
+          breakpoint = breakpoint.substring(4);
+
+          if (bps[breakpoint]) {
+            template = BP_MAX_TPL.replace('${width}', "".concat(bps[breakpoint], "px"));
+          }
+        }
+      }
+
+      if (pseudo) {
+        var nameTpl = '${name}';
+
+        if (pseudo.startsWith('group-')) {
+          var pos = pseudo.indexOf('/');
+          var gn = normalizeCssName('group' + (pos === -1 ? '' : pseudo.substring(pos)));
+
+          if (pseudo.startsWith('group-[')) {
+            var av = extractArbitraryValue(pseudo);
+
+            if (av.endsWith('_&')) {
+              nameTpl = av.substring(0, av.length - 2) + ' .' + gn + ' ${name}';
+            } else {
+              nameTpl = '.' + gn + av + ' ${name}';
+            }
+          } else {
+            pseudo = pos === -1 ? pseudo.substring(6) : pseudo.substring(6, pos);
+            nameTpl = '.' + expandModifier(gn, pseudo) + ' ${name}';
+          }
+
+          template = template.replace('${style}', addDark(nameTpl.replace('${name}', fullname)) + '{' + addContent(pseudo) + '${style}}');
+        } else if (pseudo.startsWith('peer-')) {
+          var _pos = pseudo.indexOf('/');
+
+          var pn = normalizeCssName('peer' + (_pos === -1 ? '' : pseudo.substring(_pos)));
+
+          if (pseudo.startsWith('peer-[')) {
+            var _av2 = extractArbitraryValue(pseudo);
+
+            if (_av2.endsWith('_&')) {
+              nameTpl = _av2.substring(0, _av2.length - 2) + ' .' + pn + ' ~ ${name}';
+            } else {
+              nameTpl = '.' + pn + _av2 + ' ~ ${name}';
+            }
+          } else {
+            pseudo = _pos === -1 ? pseudo.substring(5) : pseudo.substring(5, _pos);
+            nameTpl = '.' + expandModifier(pn, pseudo) + ' ~ ${name}';
+          }
+
+          template = template.replace('${style}', addDark(nameTpl.replace('${name}', fullname)) + '{' + addContent(pseudo) + '${style}}');
+        } else {
+          template = template.replace('${style}', addDark(expandModifier(fullname, pseudo)) + '{' + addContent(pseudo) + '${style}}');
+        }
+      } else {
+        template = template.replace('${style}', addDark(fullname) + '{${style}}');
+      }
+
+      cacheDecompose[key] = {
         breakpoint: breakpoint,
         pseudo: pseudo,
-        name: className
+        name: className,
+        template: template
       };
+      return cacheDecompose[key];
     } else {
       console.error("Wrong parameter ".concat(className));
     }
@@ -352,29 +516,18 @@ function setupCore(G) {
         var style = resolveClass(name);
 
         if (style) {
-          var classDetails = decomposeClassName(name);
-          var fullname = normalizeCssName(classDetails.name);
-          if (classDetails.pseudo) fullname = "".concat(classDetails.pseudo, "\\:").concat(fullname, ":").concat(classDetails.pseudo);
-          if (classDetails.breakpoint) fullname = "".concat(classDetails.breakpoint, "\\:").concat(fullname);
+          var surfix = '';
 
           if (style.name) {
             if (style.name.indexOf('$') == 0) {
-              fullname += style.name.substring(1);
-            } else {
-              fullname = style.name;
+              surfix = style.name.substring(1);
             }
 
             style = style.style;
           }
 
-          style = "{".concat(style, "}");
-
-          if (classDetails.breakpoint) {
-            style = "@media (min-width: ".concat(C.breakpoints[classDetails.breakpoint], "px) {\n  .").concat(fullname, " ").concat(style, " \n}");
-          } else {
-            style = ".".concat(fullname, " ").concat(style, " ");
-          }
-
+          var classDetails = decomposeClassName(name, surfix);
+          style = classDetails.template.replace('${style}', style);
           addedClasses[name] = true;
           var bpStyles = autoStyles[classDetails.breakpoint || ''];
           if (!bpStyles) bpStyles = autoStyles[classDetails.breakpoint || ''] = [];
@@ -1216,7 +1369,8 @@ function setupPaint(G) {
       resolveColor = _G$$vs$_.resolveColor,
       addInitStyle = _G$$vs$_.addInitStyle,
       isString = _G$$vs$_.isString;
-  var i; // Font
+  var i;
+  addInitStyle("*, ::before, ::after {--".concat(P, "-content: '';}")); // Font
 
   R('font-', function (classDetails) {
     var parts = classDetails.name.split('-');
@@ -1609,6 +1763,10 @@ function setupPaint(G) {
         return "".concat(transform, "; --").concat(P, "-skew-").concat(a, ": ").concat(s).concat(value, ";");
       }, initTransform);
     });
+  }); // Content
+
+  R("content-[", function (classDetails) {
+    return "--".concat(P, "-content: ").concat(EAV(classDetails.name), ";content: var(--").concat(P, "-content);");
   }); // Outline 
 
   R("outline-none", "outline: 2px solid transparent; outline-offset: 2px;");

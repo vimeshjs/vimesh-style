@@ -130,26 +130,166 @@ function setupCore(G) {
     let stylesOutput = null
     let generators = $vs.generators = []
     let cache = {}
+    let cacheDecompose = {}
     let knownAttributes = {}
     let resetListeners = []
     each(KNOWN_ATTR_NAMES.split(','), a => knownAttributes[a] = true)
-
-    function decomposeClassName(className) {
+    const BP_MIN_TPL = "@media (min-width: ${width}) {\n  ${style} \n}"
+    const BP_MAX_TPL = "@media not all and (min-width: ${width}) {\n  ${style} \n}"
+    const KNOWN_MEDIAS = {
+        dark: '@media (prefers-color-scheme: dark)',
+        portrait: '@media (orientation: portrait)',
+        landscape: '@media (orientation: landscape)',
+        'motion-safe': '@media (prefers-reduced-motion: no-preference)',
+        'motion-reduce': '@media (prefers-reduced-motion: reduce)',
+        'contrast-more': '@media (prefers-contrast: more)',
+        'contrast-less': '@media (prefers-contrast: less)',
+        print: '@media print'
+    }
+    const KNOWN_PE = {
+        before: 1,
+        after: 1,
+        'first-letter': 1,
+        'first-line': 1,
+        marker: 1,
+        selection: 1,
+        file: 'file-selector-button',
+        backdrop: 1,
+        placeholder: 1
+    }
+    const KNOWN_PC = {
+        hover: 1,
+        focus: 1,
+        'focus-within': 1,
+        'focus-visible': 1,
+        active: 1,
+        visited: 1,
+        target: 1,
+        first: 'first-child',
+        last: 'last-child',
+        only: 'only-child',
+        odd: 'nth-child(odd)',
+        even: 'nth-child(even)',
+        'first-of-type': 1,
+        'last-of-type': 1,
+        'only-of-type': 1,
+        empty: 1,
+        disabled: 1,
+        enabled: 1,
+        checked: 1,
+        indeterminate: 1,
+        default: 1,
+        required: 1,
+        valid: 1,
+        invalid: 1,
+        'in-range': 1,
+        'out-of-range': 1,
+        'placeholder-shown': 1,
+        autofill: 1,
+        'read-only': 1
+    }
+    function expandModifier(name, m) {
+        if (!m) return name
+        if (m == 'rtl' || m == 'ltr') return `[dir="${m}"] ${name}`
+        if (KNOWN_PC[m]) {
+            return `${name}:${KNOWN_PC[m] === 1 ? m : KNOWN_PC[m]}`
+        } else if (KNOWN_PE[m]) {
+            return `${name}::${KNOWN_PE[m] === 1 ? m : KNOWN_PE[m]}`
+        } else if (m.startsWith('aria-')) {
+            if (m.startsWith('aria-[')) {
+                let av = extractArbitraryValue(m)
+                return `${name}[aria-${av}]`
+            } else {
+                return `${name}[aria-${m.substring(5)}="true"]`
+            }
+        } else if (m.startsWith('data-[')) {
+            let av = extractArbitraryValue(m)
+            return `${name}[data-${av}]`
+        } else if (m == 'open') {
+            return `${name}[open]`
+        }
+        return name
+    }
+    function decomposeClassName(className, surfix) {
         if (isString(className)) {
+            const bps = C.breakpoints
+            let key = className + '`' + (surfix || '')
+            if (cacheDecompose[key]) return cacheDecompose[key]
+            let fullname = '.' + normalizeCssName(className) + (surfix || '')
             let breakpoint = null
             let pseudo = null
-            let segs = className.split(':')
+            let dark = className.startsWith('dark:')
+            if (dark) className = className.substring(5)
+            let segs = className.replace(/:(?=(((?!\]).)*\[)|[^\[\]]*$)/g, '\n').split('\n')
+            let template = '${style}'
+            const addDark = name => dark ? '.dark ' + name : name
+            const addContent = p => p === 'before' || p === 'after' ? `content: var(--${C.prefix}-content);` : ''
             className = segs[segs.length - 1]
             if (segs.length === 3) {
                 breakpoint = segs[0]
                 pseudo = segs[1]
             } else if (segs.length === 2) {
-                if (C.breakpoints[segs[0]])
+                if (KNOWN_MEDIAS[segs[0]] || bps[segs[0]] || segs[0].startsWith('min-') || segs[0].startsWith('max-'))
                     breakpoint = segs[0]
                 else
                     pseudo = segs[0]
             }
-            return { breakpoint, pseudo, name: className }
+            if (breakpoint) {
+                if (KNOWN_MEDIAS[breakpoint]) {
+                    template = KNOWN_MEDIAS[breakpoint] + " {\n  ${style} \n}"
+                } else if (bps[breakpoint]) {
+                    template = BP_MIN_TPL.replace('${width}', `${bps[breakpoint]}px`)
+                } else if (breakpoint.startsWith('min-[')) {
+                    template = BP_MIN_TPL.replace('${width}', extractArbitraryValue(breakpoint))
+                } else if (breakpoint.startsWith('max-[')) {
+                    template = "@media (max-width: " + extractArbitraryValue(breakpoint) + ") {\n  ${style} \n}"
+                } else if (breakpoint.startsWith('max-')) {
+                    breakpoint = breakpoint.substring(4)
+                    if (bps[breakpoint]) {
+                        template = BP_MAX_TPL.replace('${width}', `${bps[breakpoint]}px`)
+                    }
+                }
+            }
+            if (pseudo) {
+                let nameTpl = '${name}'
+                if (pseudo.startsWith('group-')) {
+                    let pos = pseudo.indexOf('/')
+                    let gn = normalizeCssName('group' + (pos === -1 ? '' : pseudo.substring(pos)))
+                    if (pseudo.startsWith('group-[')) {
+                        let av = extractArbitraryValue(pseudo)
+                        if (av.endsWith('_&')) {
+                            nameTpl = av.substring(0, av.length - 2) + ' .' + gn + ' ${name}'
+                        } else {
+                            nameTpl = '.' + gn + av + ' ${name}'
+                        }
+                    } else {
+                        pseudo = pos === -1 ? pseudo.substring(6) : pseudo.substring(6, pos)
+                        nameTpl = '.' + expandModifier(gn, pseudo) + ' ${name}'
+                    }
+                    template = template.replace('${style}', addDark(nameTpl.replace('${name}', fullname)) + '{' + addContent(pseudo) + '${style}}')
+                } else if (pseudo.startsWith('peer-')) {
+                    let pos = pseudo.indexOf('/')
+                    let pn = normalizeCssName('peer' + (pos === -1 ? '' : pseudo.substring(pos)))
+                    if (pseudo.startsWith('peer-[')) {
+                        let av = extractArbitraryValue(pseudo)
+                        if (av.endsWith('_&')) {
+                            nameTpl = av.substring(0, av.length - 2) + ' .' + pn + ' ~ ${name}'
+                        } else {
+                            nameTpl = '.' + pn + av + ' ~ ${name}'
+                        }
+                    } else {
+                        pseudo = pos === -1 ? pseudo.substring(5) : pseudo.substring(5, pos)
+                        nameTpl = '.' + expandModifier(pn, pseudo) + ' ~ ${name}'
+                    }
+                    template = template.replace('${style}', addDark(nameTpl.replace('${name}', fullname)) + '{' + addContent(pseudo) + '${style}}')
+                } else {
+                    template = template.replace('${style}', addDark(expandModifier(fullname, pseudo)) + '{' + addContent(pseudo) + '${style}}')
+                }
+            } else {
+                template = template.replace('${style}', addDark(fullname) + '{${style}}')
+            }
+            cacheDecompose[key] = { breakpoint, pseudo, name: className, template }
+            return cacheDecompose[key]
         } else {
             console.error(`Wrong parameter ${className}`)
         }
@@ -272,24 +412,15 @@ function setupCore(G) {
                 if (!name || addedClasses[name]) return
                 let style = resolveClass(name)
                 if (style) {
-                    let classDetails = decomposeClassName(name)
-                    let fullname = normalizeCssName(classDetails.name)
-                    if (classDetails.pseudo) fullname = `${classDetails.pseudo}\\:${fullname}:${classDetails.pseudo}`
-                    if (classDetails.breakpoint) fullname = `${classDetails.breakpoint}\\:${fullname}`
+                    let surfix = ''
                     if (style.name) {
                         if (style.name.indexOf('$') == 0) {
-                            fullname += style.name.substring(1)
-                        } else {
-                            fullname = style.name
+                            surfix = style.name.substring(1)
                         }
                         style = style.style
                     }
-                    style = `{${style}}`
-                    if (classDetails.breakpoint) {
-                        style = `@media (min-width: ${C.breakpoints[classDetails.breakpoint]}px) {\n  .${fullname} ${style} \n}`
-                    } else {
-                        style = `.${fullname} ${style} `
-                    }
+                    let classDetails = decomposeClassName(name, surfix)
+                    style = classDetails.template.replace('${style}', style)
                     addedClasses[name] = true
                     let bpStyles = autoStyles[classDetails.breakpoint || '']
                     if (!bpStyles) bpStyles = autoStyles[classDetails.breakpoint || ''] = []
