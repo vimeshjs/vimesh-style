@@ -5,10 +5,14 @@ const $vs = setupVimeshStyle()
 
 test('generate css classes from html', () => {
     let expectedCssOutput = normalizeCss(`
+    *,
+     ::before,
+     ::after {
+       --vs-content: '';
+    }
     .w-2 {
         width: 0.5rem;
     }
-        
     .text-red-500 {
         --vs-text-opacity: 1;
         color: rgba(239,68,68,var(--vs-text-opacity));
@@ -23,7 +27,7 @@ test('generate css classes from html', () => {
     let cssOutput = normalizeCss($vs.styles)
 
     expect(cssOutput).toBe(expectedCssOutput)
-    
+
     expectedCssOutput = normalizeCss(preset + expectedCssOutput)
     $vs.config.preset = preset
     $vs.reset()
