@@ -1,4 +1,4 @@
-// Vimesh Style v1.1.0
+// Vimesh Style v1.1.1
 
 function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
@@ -715,6 +715,9 @@ function setupLayout(G) {
     const C = G.$vs.config
     const P = C.prefix
     let i
+
+    // Vars
+    R(`[`, classDetails => `${EAV(classDetails.name)};`)
 
     // Container
     R('container', classDetails => {

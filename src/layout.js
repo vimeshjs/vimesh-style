@@ -9,6 +9,9 @@ function setupLayout(G) {
     const P = C.prefix
     let i
 
+    // Vars
+    R(`[`, classDetails => `${EAV(classDetails.name)};`)
+
     // Container
     R('container', classDetails => {
         if (classDetails.breakpoint) {
