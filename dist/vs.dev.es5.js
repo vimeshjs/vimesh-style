@@ -1,4 +1,4 @@
-// Vimesh Style (ES5) v1.1.1
+// Vimesh Style (ES5) v1.1.2
 "use strict";
 
 function _wrapRegExp() { _wrapRegExp = function _wrapRegExp(re, groups) { return new BabelRegExp(re, void 0, groups); }; var _super = RegExp.prototype, _groups = new WeakMap(); function BabelRegExp(re, flags, groups) { var _this = new RegExp(re, flags); return _groups.set(_this, groups || _groups.get(re)), _setPrototypeOf(_this, BabelRegExp.prototype); } function buildGroups(result, re) { var g = _groups.get(re); return Object.keys(g).reduce(function (groups, name) { return groups[name] = result[g[name]], groups; }, Object.create(null)); } return _inherits(BabelRegExp, RegExp), BabelRegExp.prototype.exec = function (str) { var result = _super.exec.call(this, str); return result && (result.groups = buildGroups(result, this)), result; }, BabelRegExp.prototype[Symbol.replace] = function (str, substitution) { if ("string" == typeof substitution) { var groups = _groups.get(this); return _super[Symbol.replace].call(this, str, substitution.replace(/\$<([^>]+)>/g, function (_, name) { return "$" + groups[name]; })); } if ("function" == typeof substitution) { var _this = this; return _super[Symbol.replace].call(this, str, function () { var args = arguments; return "object" != _typeof(args[args.length - 1]) && (args = [].slice.call(args)).push(buildGroups(args, _this)), substitution.apply(this, args); }); } return _super[Symbol.replace].call(this, str, substitution); }, _wrapRegExp.apply(this, arguments); }
@@ -6,6 +6,12 @@ function _wrapRegExp() { _wrapRegExp = function _wrapRegExp(re, groups) { return
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); Object.defineProperty(subClass, "prototype", { writable: false }); if (superClass) _setPrototypeOf(subClass, superClass); }
 
 function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); enumerableOnly && (symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; })), keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = null != arguments[i] ? arguments[i] : {}; i % 2 ? ownKeys(Object(source), !0).forEach(function (key) { _defineProperty(target, key, source[key]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)) : ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } return target; }
+
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
 function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _unsupportedIterableToArray(arr) || _nonIterableSpread(); }
 
@@ -39,6 +45,7 @@ function setupCore(G) {
       prefix: 'vs',
       attributify: 'none',
       // all, none, prefix
+      spacePlaceholder: '`',
       breakpoints: {
         sm: 640,
         md: 768,
@@ -188,6 +195,7 @@ function setupCore(G) {
   var autoStyles = {};
   var initStyles = [];
   var macroCss = [];
+  var rootVars = {};
   var styleElement = null;
   var stylesOutput = null;
   var generators = $vs.generators = [];
@@ -461,6 +469,10 @@ function setupCore(G) {
     if (isPlainObject(css)) macroCss.push(css);else if (isArray(css)) macroCss.push.apply(macroCss, _toConsumableArray(css));
   }
 
+  function addRootVars(vars) {
+    rootVars = _objectSpread(_objectSpread({}, rootVars), vars);
+  }
+
   function updateAutoStyles() {
     var keys = Object.keys(autoStyles).sort(function (a, b) {
       return (C.breakpoints[a] || 0) - (C.breakpoints[b] || 0);
@@ -478,6 +490,16 @@ function setupCore(G) {
         macroStyles.push("".concat(selectors, " {").concat(extended, "}"));
       });
     });
+    var varDefs = [];
+    each(rootVars, function (v, k) {
+      if (!k.startsWith('--')) k = '--' + k;
+      varDefs.push("".concat(k, ":").concat(v, ";"));
+    });
+
+    if (varDefs.length > 0) {
+      macroStyles.push(":root{\n".concat(varDefs.join('\n'), "\n}"));
+    }
+
     all = all.concat(macroStyles);
 
     if (all.length > 0) {
@@ -806,7 +828,7 @@ function setupCore(G) {
     if (!name) return null;
     var p1 = name.indexOf('[');
     var p2 = name.indexOf(']');
-    if (p1 >= 0 && p2 > p1) return name.substring(p1 + 1, p2);
+    if (p1 >= 0 && p2 > p1) return name.substring(p1 + 1, p2).split($vs.config.spacePlaceholder).join(' ');
     return null;
   }
 
@@ -830,6 +852,7 @@ function setupCore(G) {
     extract: extractClasses,
     add: addClasses,
     addMacroCss: addMacroCss,
+    addRootVars: addRootVars,
     resolveAll: resolveAll,
     register: register
   });
@@ -948,6 +971,9 @@ function setupLayout(G) {
   }, function (v, k) {
     return R("flex-".concat(k), "flex: ".concat(v, ";"));
   });
+  R("flex-[", function (classDetails) {
+    return "flex: ".concat(EAV(classDetails.name), ";");
+  });
   E(['row', 'row-reverse', 'col', 'col-reverse'], function (v) {
     return R("flex-".concat(v), "flex-direction: ".concat(v.replace('col', 'column'), ";"));
   });
@@ -969,10 +995,16 @@ function setupLayout(G) {
 
   E(['left', 'right', 'both', 'none'], function (v) {
     return R("clear-".concat(v), "clear: ".concat(v, ";"));
+  });
+  R("clear-[", function (classDetails) {
+    return "clear: ".concat(EAV(classDetails.name), ";");
   }); // Position
 
   E(['static', 'fixed', 'absolute', 'relative', 'sticky'], function (v) {
     return R(v, "position: ".concat(v, ";"));
+  });
+  R("position-[", function (classDetails) {
+    return "position: ".concat(EAV(classDetails.name), ";");
   }); // Width & Height
 
   E({
@@ -1201,8 +1233,11 @@ function setupLayout(G) {
 
   for (i = 1; i <= 12; i++) {
     R("order-".concat(i), "order: ".concat(i, ";"));
-  } // Grid
+  }
 
+  R("order-[", function (classDetails) {
+    return "order: ".concat(EAV(classDetails.name), ";");
+  }); // Grid
 
   R("grid-cols-none", "grid-template-columns: none;");
 
@@ -1288,6 +1323,12 @@ function setupLayout(G) {
     R("justify-".concat(k), "justify-content: ".concat(v, ";"));
     R("content-".concat(k), "align-content: ".concat(v, ";"));
   });
+  R("justify-[", function (classDetails) {
+    return "justify-content: ".concat(EAV(classDetails.name), ";");
+  });
+  R("content-[", function (classDetails) {
+    return "align-content: ".concat(EAV(classDetails.name), ";");
+  });
   E({
     start: 'start',
     end: 'end',
@@ -1299,19 +1340,40 @@ function setupLayout(G) {
   }, function (v, k) {
     R("place-content-".concat(k), "place-content: ".concat(v, ";"));
   });
+  R("place-content-[", function (classDetails) {
+    return "place-content: ".concat(EAV(classDetails.name), ";");
+  });
   E(['start', 'end', 'center', 'stretch'], function (v) {
     R("justify-items-".concat(v), "justify-items: ".concat(v, ";"));
     R("place-items-".concat(v), "place-items: ".concat(v, ";"));
+  });
+  R("justify-items-[", function (classDetails) {
+    return "justify-items: ".concat(EAV(classDetails.name), ";");
+  });
+  R("place-items-[", function (classDetails) {
+    return "place-items: ".concat(EAV(classDetails.name), ";");
   });
   E(['auto', 'start', 'end', 'center', 'stretch'], function (v) {
     R("justify-self-".concat(v), "justify-self: ".concat(v, ";"));
     R("place-self-".concat(v), "place-self: ".concat(v, ";"));
   });
+  R("justify-self-[", function (classDetails) {
+    return "justify-self: ".concat(EAV(classDetails.name), ";");
+  });
+  R("place-self-[", function (classDetails) {
+    return "place-self: ".concat(EAV(classDetails.name), ";");
+  });
   E(['start', 'end', 'center', 'baseline', 'stretch'], function (v) {
     return R("items-".concat(v), "align-items: ".concat(v, ";"));
   });
+  R("items-[", function (classDetails) {
+    return "align-items: ".concat(EAV(classDetails.name), ";");
+  });
   E(['auto', 'start', 'end', 'center', 'baseline', 'stretch'], function (v) {
     return R("self-".concat(v), "align-self: ".concat(v, ";"));
+  });
+  R("self-[", function (classDetails) {
+    return "align-self: ".concat(EAV(classDetails.name), ";");
   }); // Box Sizing & Decoration Break
 
   R("decoration-slice", "box-decoration-break: slice;");
@@ -1324,6 +1386,9 @@ function setupLayout(G) {
 
   E(['left', 'right', 'none'], function (v) {
     return R("float-".concat(v), "float: ".concat(v, ";"));
+  });
+  R("float-[", function (classDetails) {
+    return "float: ".concat(EAV(classDetails.name), ";");
   }); // Object Fit & Position
 
   E(['contain', 'cover', 'fill', 'none', 'scale-down'], function (v) {
@@ -1350,7 +1415,8 @@ function setupLayout(G) {
 
   E([0, 10, 20, 30, 40, 50, 'auto'], function (v) {
     return R("z-".concat(v), "z-index: ".concat(v, ";"));
-  }); // Tables
+  });
+  R("z-[", "z-index: ".concat(EAV(classDetails.name), ";")); // Tables
 
   R("border-collapse", "border-collapse: collapse;");
   R("border-separate", "border-collapse: separate;");

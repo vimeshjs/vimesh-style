@@ -7,6 +7,7 @@ function setupCore(G) {
             auto: true,
             prefix: 'vs',
             attributify: 'none', // all, none, prefix
+            spacePlaceholder : '`',
             breakpoints: {
                 sm: 640,
                 md: 768,
@@ -126,6 +127,7 @@ function setupCore(G) {
     let autoStyles = {}
     let initStyles = []
     let macroCss = []
+    let rootVars = {}
     let styleElement = null
     let stylesOutput = null
     let generators = $vs.generators = []
@@ -367,6 +369,9 @@ function setupCore(G) {
         else if (isArray(css))
             macroCss.push(...css)
     }
+    function addRootVars(vars){
+        rootVars = {...rootVars, ...vars}
+    }
     function updateAutoStyles() {
         let keys = Object.keys(autoStyles).sort((a, b) => (C.breakpoints[a] || 0) - (C.breakpoints[b] || 0))
         let all = initStyles
@@ -378,6 +383,14 @@ function setupCore(G) {
                 macroStyles.push(`${selectors} {${extended}}`)
             })
         })
+        let varDefs = []
+        each(rootVars, (v, k) => {
+            if (!k.startsWith('--')) k = '--' + k
+            varDefs.push(`${k}:${v};`)
+        })
+        if (varDefs.length > 0){
+            macroStyles.push(`:root{\n${varDefs.join('\n')}\n}`)
+        }
         all = all.concat(macroStyles)
         if (all.length > 0) {
             let newStyles = (C.preset ? [C.preset] : []).concat(all).join('\n')
@@ -634,7 +647,7 @@ function setupCore(G) {
         let p1 = name.indexOf('[')
         let p2 = name.indexOf(']')
         if (p1 >= 0 && p2 > p1)
-            return name.substring(p1 + 1, p2)
+            return name.substring(p1 + 1, p2).split($vs.config.spacePlaceholder).join(' ')
         return null
     }
     extend($vs._, {
@@ -654,6 +667,7 @@ function setupCore(G) {
         extract: extractClasses,
         add: addClasses,
         addMacroCss,
+        addRootVars,
         resolveAll,
         register
     })

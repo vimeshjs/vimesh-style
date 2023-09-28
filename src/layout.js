@@ -35,7 +35,8 @@ function setupLayout(G) {
         R(`${p}shrink-0`, `flex-shrink: 0;`)
         R(`${p}shrink`, `flex-shrink: 1;`)
     })
-    E({ '1': '1 1 0%', auto: "1 1 auto", initial: "0 1 auto", none: 'none' }, (v, k) => R(`flex-${k}`, `flex: ${v};`))
+    E({ '1': '1 1 0%', auto: "1 1 auto", initial: "0 1 auto", none: 'none' }, (v, k) => R(`flex-${k}`, `flex: ${v};`))    
+    R(`flex-[`, classDetails => `flex: ${EAV(classDetails.name)};`)
     E(['row', 'row-reverse', 'col', 'col-reverse'], v => R(`flex-${v}`, `flex-direction: ${v.replace('col', 'column')};`))
     E(['wrap', 'wrap-reverse', 'nowrap'], v => R(`flex-${v}`, `flex-wrap: ${v};`))
 
@@ -45,11 +46,14 @@ function setupLayout(G) {
         R(`basis-${name}`, `flex-basis: ${value};`)
     })
     R(`basis-[`, classDetails => `flex-basis: ${EAV(classDetails.name)};`)
+
     // Clear
-    E(['left', 'right', 'both', 'none'], v => R(`clear-${v}`, `clear: ${v};`))
+    E(['left', 'right', 'both', 'none'], v => R(`clear-${v}`, `clear: ${v};`)) 
+    R(`clear-[`, classDetails => `clear: ${EAV(classDetails.name)};`)
 
     // Position
     E(['static', 'fixed', 'absolute', 'relative', 'sticky'], v => R(v, `position: ${v};`))
+    R(`position-[`, classDetails => `position: ${EAV(classDetails.name)};`)
 
     // Width & Height
     E({ auto: 'auto', full: '100%', screen: '100vw', min: 'min-content', max: 'max-content', fit: 'fit-content' }, (v, k) => R(`w-${k}`, `width: ${v};`))
@@ -203,6 +207,7 @@ function setupLayout(G) {
     // Order
     E({ first: -9999, last: 9999, none: 0 }, (v, k) => R(`order-${k}`, `order: ${v};`))
     for (i = 1; i <= 12; i++) R(`order-${i}`, `order: ${i};`)
+    R(`order-[`, classDetails => `order: ${EAV(classDetails.name)};`)
 
     // Grid
     R(`grid-cols-none`, `grid-template-columns: none;`)
@@ -257,19 +262,33 @@ function setupLayout(G) {
         R(`justify-${k}`, `justify-content: ${v};`)
         R(`content-${k}`, `align-content: ${v};`)
     })
+    R(`justify-[`, classDetails => `justify-content: ${EAV(classDetails.name)};`)
+    R(`content-[`, classDetails => `align-content: ${EAV(classDetails.name)};`)
+
     E({ start: 'start', end: 'end', center: 'center', stretch: 'stretch', between: 'space-between', around: 'space-around', evenly: 'space-evenly' }, (v, k) => {
         R(`place-content-${k}`, `place-content: ${v};`)
     })
+    R(`place-content-[`, classDetails => `place-content: ${EAV(classDetails.name)};`)
+
     E(['start', 'end', 'center', 'stretch'], v => {
         R(`justify-items-${v}`, `justify-items: ${v};`)
         R(`place-items-${v}`, `place-items: ${v};`)
     })
+    R(`justify-items-[`, classDetails => `justify-items: ${EAV(classDetails.name)};`)
+    R(`place-items-[`, classDetails => `place-items: ${EAV(classDetails.name)};`)
+
     E(['auto', 'start', 'end', 'center', 'stretch'], v => {
         R(`justify-self-${v}`, `justify-self: ${v};`)
         R(`place-self-${v}`, `place-self: ${v};`)
     })
+    R(`justify-self-[`, classDetails => `justify-self: ${EAV(classDetails.name)};`)
+    R(`place-self-[`, classDetails => `place-self: ${EAV(classDetails.name)};`)
+
     E(['start', 'end', 'center', 'baseline', 'stretch'], v => R(`items-${v}`, `align-items: ${v};`))
+    R(`items-[`, classDetails => `align-items: ${EAV(classDetails.name)};`)
+
     E(['auto', 'start', 'end', 'center', 'baseline', 'stretch'], v => R(`self-${v}`, `align-self: ${v};`))
+    R(`self-[`, classDetails => `align-self: ${EAV(classDetails.name)};`)
 
     // Box Sizing & Decoration Break
     R(`decoration-slice`, `box-decoration-break: slice;`)
@@ -283,6 +302,7 @@ function setupLayout(G) {
 
     // Float
     E(['left', 'right', 'none'], v => R(`float-${v}`, `float: ${v};`))
+    R(`float-[`, classDetails => `float: ${EAV(classDetails.name)};`)
 
     // Object Fit & Position
     E(['contain', 'cover', 'fill', 'none', 'scale-down'], v => R(`object-${v}`, `object-fit: ${v};`))
@@ -308,6 +328,7 @@ function setupLayout(G) {
 
     // Z-Index
     E([0, 10, 20, 30, 40, 50, 'auto'], v => R(`z-${v}`, `z-index: ${v};`))
+    R(`z-[`, `z-index: ${EAV(classDetails.name)};`)
 
     // Tables
     R(`border-collapse`, `border-collapse: collapse;`)
