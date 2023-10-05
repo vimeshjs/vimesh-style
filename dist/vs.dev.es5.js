@@ -1,4 +1,4 @@
-// Vimesh Style (ES5) v1.1.2
+// Vimesh Style (ES5) v1.1.3
 "use strict";
 
 function _wrapRegExp() { _wrapRegExp = function _wrapRegExp(re, groups) { return new BabelRegExp(re, void 0, groups); }; var _super = RegExp.prototype, _groups = new WeakMap(); function BabelRegExp(re, flags, groups) { var _this = new RegExp(re, flags); return _groups.set(_this, groups || _groups.get(re)), _setPrototypeOf(_this, BabelRegExp.prototype); } function buildGroups(result, re) { var g = _groups.get(re); return Object.keys(g).reduce(function (groups, name) { return groups[name] = result[g[name]], groups; }, Object.create(null)); } return _inherits(BabelRegExp, RegExp), BabelRegExp.prototype.exec = function (str) { var result = _super.exec.call(this, str); return result && (result.groups = buildGroups(result, this)), result; }, BabelRegExp.prototype[Symbol.replace] = function (str, substitution) { if ("string" == typeof substitution) { var groups = _groups.get(this); return _super[Symbol.replace].call(this, str, substitution.replace(/\$<([^>]+)>/g, function (_, name) { return "$" + groups[name]; })); } if ("function" == typeof substitution) { var _this = this; return _super[Symbol.replace].call(this, str, function () { var args = arguments; return "object" != _typeof(args[args.length - 1]) && (args = [].slice.call(args)).push(buildGroups(args, _this)), substitution.apply(this, args); }); } return _super[Symbol.replace].call(this, str, substitution); }, _wrapRegExp.apply(this, arguments); }
@@ -1416,7 +1416,9 @@ function setupLayout(G) {
   E([0, 10, 20, 30, 40, 50, 'auto'], function (v) {
     return R("z-".concat(v), "z-index: ".concat(v, ";"));
   });
-  R("z-[", "z-index: ".concat(EAV(classDetails.name), ";")); // Tables
+  R("z-[", function (classDetails) {
+    return "z-index: ".concat(EAV(classDetails.name), ";");
+  }); // Tables
 
   R("border-collapse", "border-collapse: collapse;");
   R("border-separate", "border-collapse: separate;");

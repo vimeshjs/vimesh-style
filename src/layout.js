@@ -328,7 +328,7 @@ function setupLayout(G) {
 
     // Z-Index
     E([0, 10, 20, 30, 40, 50, 'auto'], v => R(`z-${v}`, `z-index: ${v};`))
-    R(`z-[`, `z-index: ${EAV(classDetails.name)};`)
+    R(`z-[`, classDetails => `z-index: ${EAV(classDetails.name)};`)
 
     // Tables
     R(`border-collapse`, `border-collapse: collapse;`)

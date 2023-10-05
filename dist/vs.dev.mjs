@@ -1,4 +1,4 @@
-// Vimesh Style v1.1.2
+// Vimesh Style v1.1.3
 
 function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
@@ -1049,7 +1049,7 @@ function setupLayout(G) {
 
     // Z-Index
     E([0, 10, 20, 30, 40, 50, 'auto'], v => R(`z-${v}`, `z-index: ${v};`))
-    R(`z-[`, `z-index: ${EAV(classDetails.name)};`)
+    R(`z-[`, classDetails => `z-index: ${EAV(classDetails.name)};`)
 
     // Tables
     R(`border-collapse`, `border-collapse: collapse;`)
