@@ -1,4 +1,4 @@
-// Vimesh Style v1.1.3
+// Vimesh Style v1.1.5
 
 function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
@@ -1191,6 +1191,8 @@ function setupPaint(G) {
     E([0, 1, 2, 4, 8], w => {
         R(`border${w == 1 ? '' : `-${w}`}`, `border-width: ${w}px;`)
         E(Object.keys(DM), d => R(`border-${d}${w == 1 ? '' : `-${w}`}`, `border-${DM[d]}-width: ${w}px;`))
+        R(`border-x${w == 1 ? '' : `-${w}`}`, `border-left-width: ${w}px;border-right-width: ${w}px;`)
+        R(`border-y${w == 1 ? '' : `-${w}`}`, `border-top-width: ${w}px;border-bottom-width: ${w}px;`)
     })
     GC('border', 'border-color')
     E(['solid', 'dashed', 'dotted', 'double', 'none'], v => R(`border-${v}`, `border-style: ${v};`))
