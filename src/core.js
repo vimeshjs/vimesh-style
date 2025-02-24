@@ -7,7 +7,7 @@ function setupCore(G) {
             auto: true,
             prefix: 'vs',
             attributify: 'none', // all, none, prefix
-            spacePlaceholder : '`',
+            spacePlaceholder: '`',
             breakpoints: {
                 sm: 640,
                 md: 768,
@@ -118,7 +118,32 @@ function setupCore(G) {
         }
         return target
     }
-    $vs._ = { isString, isNumeric, isArray, isFunction, isPlainObject, each, extend }
+    function deepMerge(target, source) {
+        if (!source || typeof source !== 'object') {
+            return target
+        }
+        if (!target || typeof target !== 'object') {
+            target = Array.isArray(source) ? [] : {}
+        }
+        for (const key in source) {
+            if (Object.prototype.hasOwnProperty.call(source, key)) {
+                const sourceValue = source[key]
+                if (Array.isArray(sourceValue)) {
+                    target[key] = Array.isArray(target[key])
+                        ? target[key].map((item, index) =>
+                            sourceValue[index] ? deepMerge(item, sourceValue[index]) : item
+                        ).concat(sourceValue.slice(target[key].length))
+                        : [...sourceValue]
+                } else if (sourceValue && typeof sourceValue === 'object') {
+                    target[key] = deepMerge(target[key], sourceValue);
+                } else {
+                    target[key] = sourceValue
+                }
+            }
+        }
+        return target
+    }
+    $vs._ = { isString, isNumeric, isArray, isFunction, isPlainObject, each, extend, deepMerge }
 
     const KNOWN_ATTR_NAMES = 'font,text,underline,list,bg,gradient,border,divide,ring,icon,container,p,m,space,w,min-w,max-w,h,min-h,max-h,flex,grid,table,order,align,justify,place,display,pos,box,caret,isolation,object,overflow,overscroll,z,shadow,opacity,blend,filter,backdrop,transition,animate,transform,appearance,cursor,outline,pointer,resize,select,sr'
     let addedClasses = {}
@@ -369,8 +394,8 @@ function setupCore(G) {
         else if (isArray(css))
             macroCss.push(...css)
     }
-    function addRootVars(vars){
-        rootVars = {...rootVars, ...vars}
+    function addRootVars(vars) {
+        rootVars = { ...rootVars, ...vars }
     }
     function updateAutoStyles() {
         let keys = Object.keys(autoStyles).sort((a, b) => (C.breakpoints[a] || 0) - (C.breakpoints[b] || 0))
@@ -388,7 +413,7 @@ function setupCore(G) {
             if (!k.startsWith('--')) k = '--' + k
             varDefs.push(`${k}:${v};`)
         })
-        if (varDefs.length > 0){
+        if (varDefs.length > 0) {
             macroStyles.push(`:root{\n${varDefs.join('\n')}\n}`)
         }
         all = all.concat(macroStyles)
@@ -521,7 +546,18 @@ function setupCore(G) {
         each(all, el => allClasses.push(...recordKnownClasses(el)))
         addClasses(allClasses, update)
     }
-    function resetStyles() {
+    function resetStyles(extraConfig) {
+        if (extraConfig) {
+            deepMerge(C, extraConfig)
+            if (extraConfig.aliasColors) {
+                each(extraConfig.aliasColors, (alias, name) => {
+                    if (alias && !C.colors[alias] && alias[0] === '#') {
+                        C.colors[name] = hexToPalette(alias)
+                        delete C.aliasColors[name]
+                    }
+                })
+            }
+        }
         each(resetListeners, callback => callback())
         addedClasses = {}
         autoStyles = {}
@@ -561,6 +597,128 @@ function setupCore(G) {
     function rgbToHex(rgb) {
         let { r, g, b } = rgb
         return ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
+    }
+
+    function hexToHsv(hex) {
+        hex = hex.replace(/^#/, "");
+        if (hex.length === 3) {
+            hex = hex
+                .split("")
+                .map((c) => c + c)
+                .join("");
+        }
+
+        const [r, g, b] = hex.match(/\w{2}/g).map((v) => parseInt(v, 16) / 255);
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const diff = max - min;
+
+        let h = 0;
+        const s = max === 0 ? 0 : diff / max;
+        const v = max;
+
+        if (diff !== 0) {
+            const cases = [
+                [g, b, (g - b) / diff + (g < b ? 6 : 0)], // r is max
+                [b, r, (b - r) / diff + 2], // g is max
+                [r, g, (r - g) / diff + 4], // b is max
+            ];
+            h = cases[[r, g, b].indexOf(max)][2];
+            h /= 6;
+        }
+
+        return { h: h * 360, s, v };
+    }
+
+    function hsvToHex(hsv) {
+        const { h, s, v } = hsv;
+        const hh = h / 360;
+        const i = Math.floor(hh * 6);
+        const f = hh * 6 - i;
+        const p = v * (1 - s);
+        const q = v * (1 - f * s);
+        const t = v * (1 - (1 - f) * s);
+
+        const cases = [
+            [v, t, p], // case 0
+            [q, v, p], // case 1
+            [p, v, t], // case 2
+            [p, q, v], // case 3
+            [t, p, v], // case 4
+            [v, p, q], // case 5
+        ];
+        const [r, g, b] = cases[i % 6];
+
+        const toHex = (x) =>
+            Math.round(x * 255)
+                .toString(16)
+                .padStart(2, "0");
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+
+    const hueStep = 2;
+    const saturationStep = 0.16;
+    const saturationStep2 = 0.05;
+    const brightnessStep1 = 0.05;
+    const brightnessStep2 = 0.15;
+    const lightColorCount = 5;
+    const darkColorCount = 4;
+
+    function getHue(hsv, i, light) {
+        const roundedH = Math.round(hsv.h);
+        const hInRange = roundedH >= 60 && roundedH <= 240;
+        const step = hueStep * i;
+        const adjust = light === hInRange ? -1 : 1;
+        let hue = hsv.h + adjust * step;
+        hue = ((hue % 360) + 360) % 360; // 规范化到0-359范围
+        return Math.round(hue);
+    }
+
+    function getSaturation(hsv, i, light) {
+        if (hsv.h + hsv.s === 0) return hsv.s; // 优化灰度判断
+
+        let saturation = light
+            ? hsv.s - saturationStep * i
+            : i === darkColorCount
+                ? hsv.s + saturationStep
+                : hsv.s + saturationStep2 * i;
+
+        if (light && i === lightColorCount)
+            saturation = Math.min(saturation, 0.1);
+        return Number(Math.max(0.06, Math.min(1, saturation)).toFixed(2));
+    }
+
+    function getValue(hsv, i, light) {
+        const value = light
+            ? hsv.v + brightnessStep1 * i
+            : hsv.v - brightnessStep2 * i;
+        return Number(Math.max(0, Math.min(1, value)).toFixed(2));
+    }
+
+    function hexToPalette(hex) {
+        const patterns = [];
+        const primaryColor = hexToHsv(hex);
+        const hsv = primaryColor;
+
+        for (let i = lightColorCount; i > 0; i--) {
+            patterns.push({
+                h: getHue(hsv, i, true),
+                s: getSaturation(hsv, i, true),
+                v: getValue(hsv, i, true),
+            });
+        }
+
+        patterns.push(primaryColor);
+
+        for (let i = 1; i <= darkColorCount; i++) {
+            patterns.push({
+                h: getHue(hsv, i),
+                s: getSaturation(hsv, i),
+                v: getValue(hsv, i),
+            });
+        }
+
+        return patterns.map((c) => hsvToHex(c));
     }
     function resolveColor(name) {
         if (!name) return null
@@ -654,6 +812,7 @@ function setupCore(G) {
         hexToRgb,
         rgbToHex,
         resolveColor,
+        hexToPalette,
         generateColors,
         generateSizes,
         resolveClass,

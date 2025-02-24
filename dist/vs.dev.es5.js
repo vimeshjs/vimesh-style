@@ -1,4 +1,4 @@
-// Vimesh Style (ES5) v1.1.5
+// Vimesh Style (ES5) v1.1.6
 "use strict";
 
 function _wrapRegExp() { _wrapRegExp = function _wrapRegExp(re, groups) { return new BabelRegExp(re, void 0, groups); }; var _super = RegExp.prototype, _groups = new WeakMap(); function BabelRegExp(re, flags, groups) { var _this = new RegExp(re, flags); return _groups.set(_this, groups || _groups.get(re)), _setPrototypeOf(_this, BabelRegExp.prototype); } function buildGroups(result, re) { var g = _groups.get(re); return Object.keys(g).reduce(function (groups, name) { return groups[name] = result[g[name]], groups; }, Object.create(null)); } return _inherits(BabelRegExp, RegExp), BabelRegExp.prototype.exec = function (str) { var result = _super.exec.call(this, str); return result && (result.groups = buildGroups(result, this)), result; }, BabelRegExp.prototype[Symbol.replace] = function (str, substitution) { if ("string" == typeof substitution) { var groups = _groups.get(this); return _super[Symbol.replace].call(this, str, substitution.replace(/\$<([^>]+)>/g, function (_, name) { return "$" + groups[name]; })); } if ("function" == typeof substitution) { var _this = this; return _super[Symbol.replace].call(this, str, function () { var args = arguments; return "object" != _typeof(args[args.length - 1]) && (args = [].slice.call(args)).push(buildGroups(args, _this)), substitution.apply(this, args); }); } return _super[Symbol.replace].call(this, str, substitution); }, _wrapRegExp.apply(this, arguments); }
@@ -179,6 +179,36 @@ function setupCore(G) {
     return target;
   }
 
+  function deepMerge(target, source) {
+    if (!source || _typeof(source) !== 'object') {
+      return target;
+    }
+
+    if (!target || _typeof(target) !== 'object') {
+      target = Array.isArray(source) ? [] : {};
+    }
+
+    for (var key in source) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        (function () {
+          var sourceValue = source[key];
+
+          if (Array.isArray(sourceValue)) {
+            target[key] = Array.isArray(target[key]) ? target[key].map(function (item, index) {
+              return sourceValue[index] ? deepMerge(item, sourceValue[index]) : item;
+            }).concat(sourceValue.slice(target[key].length)) : _toConsumableArray(sourceValue);
+          } else if (sourceValue && _typeof(sourceValue) === 'object') {
+            target[key] = deepMerge(target[key], sourceValue);
+          } else {
+            target[key] = sourceValue;
+          }
+        })();
+      }
+    }
+
+    return target;
+  }
+
   $vs._ = {
     isString: isString,
     isNumeric: isNumeric,
@@ -186,7 +216,8 @@ function setupCore(G) {
     isFunction: isFunction,
     isPlainObject: isPlainObject,
     each: each,
-    extend: extend
+    extend: extend,
+    deepMerge: deepMerge
   };
   var KNOWN_ATTR_NAMES = 'font,text,underline,list,bg,gradient,border,divide,ring,icon,container,p,m,space,w,min-w,max-w,h,min-h,max-h,flex,grid,table,order,align,justify,place,display,pos,box,caret,isolation,object,overflow,overscroll,z,shadow,opacity,blend,filter,backdrop,transition,animate,transform,appearance,cursor,outline,pointer,resize,select,sr';
   var addedClasses = {};
@@ -662,7 +693,20 @@ function setupCore(G) {
     addClasses(allClasses, update);
   }
 
-  function resetStyles() {
+  function resetStyles(extraConfig) {
+    if (extraConfig) {
+      deepMerge(C, extraConfig);
+
+      if (extraConfig.aliasColors) {
+        each(extraConfig.aliasColors, function (alias, name) {
+          if (alias && !C.colors[alias] && alias[0] === '#') {
+            C.colors[name] = hexToPalette(alias);
+            delete C.aliasColors[name];
+          }
+        });
+      }
+    }
+
     each(resetListeners, function (callback) {
       return callback();
     });
@@ -722,6 +766,136 @@ function setupCore(G) {
         g = rgb.g,
         b = rgb.b;
     return ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
+  }
+
+  function hexToHsv(hex) {
+    hex = hex.replace(/^#/, "");
+
+    if (hex.length === 3) {
+      hex = hex.split("").map(function (c) {
+        return c + c;
+      }).join("");
+    }
+
+    var _hex$match$map = hex.match(/\w{2}/g).map(function (v) {
+      return parseInt(v, 16) / 255;
+    }),
+        _hex$match$map2 = _slicedToArray(_hex$match$map, 3),
+        r = _hex$match$map2[0],
+        g = _hex$match$map2[1],
+        b = _hex$match$map2[2];
+
+    var max = Math.max(r, g, b);
+    var min = Math.min(r, g, b);
+    var diff = max - min;
+    var h = 0;
+    var s = max === 0 ? 0 : diff / max;
+    var v = max;
+
+    if (diff !== 0) {
+      var cases = [[g, b, (g - b) / diff + (g < b ? 6 : 0)], // r is max
+      [b, r, (b - r) / diff + 2], // g is max
+      [r, g, (r - g) / diff + 4] // b is max
+      ];
+      h = cases[[r, g, b].indexOf(max)][2];
+      h /= 6;
+    }
+
+    return {
+      h: h * 360,
+      s: s,
+      v: v
+    };
+  }
+
+  function hsvToHex(hsv) {
+    var h = hsv.h,
+        s = hsv.s,
+        v = hsv.v;
+    var hh = h / 360;
+    var i = Math.floor(hh * 6);
+    var f = hh * 6 - i;
+    var p = v * (1 - s);
+    var q = v * (1 - f * s);
+    var t = v * (1 - (1 - f) * s);
+    var cases = [[v, t, p], // case 0
+    [q, v, p], // case 1
+    [p, v, t], // case 2
+    [p, q, v], // case 3
+    [t, p, v], // case 4
+    [v, p, q] // case 5
+    ];
+
+    var _cases = _slicedToArray(cases[i % 6], 3),
+        r = _cases[0],
+        g = _cases[1],
+        b = _cases[2];
+
+    var toHex = function toHex(x) {
+      return Math.round(x * 255).toString(16).padStart(2, "0");
+    };
+
+    return "#".concat(toHex(r)).concat(toHex(g)).concat(toHex(b));
+  }
+
+  var hueStep = 2;
+  var saturationStep = 0.16;
+  var saturationStep2 = 0.05;
+  var brightnessStep1 = 0.05;
+  var brightnessStep2 = 0.15;
+  var lightColorCount = 5;
+  var darkColorCount = 4;
+
+  function getHue(hsv, i, light) {
+    var roundedH = Math.round(hsv.h);
+    var hInRange = roundedH >= 60 && roundedH <= 240;
+    var step = hueStep * i;
+    var adjust = light === hInRange ? -1 : 1;
+    var hue = hsv.h + adjust * step;
+    hue = (hue % 360 + 360) % 360; // 规范化到0-359范围
+
+    return Math.round(hue);
+  }
+
+  function getSaturation(hsv, i, light) {
+    if (hsv.h + hsv.s === 0) return hsv.s; // 优化灰度判断
+
+    var saturation = light ? hsv.s - saturationStep * i : i === darkColorCount ? hsv.s + saturationStep : hsv.s + saturationStep2 * i;
+    if (light && i === lightColorCount) saturation = Math.min(saturation, 0.1);
+    return Number(Math.max(0.06, Math.min(1, saturation)).toFixed(2));
+  }
+
+  function getValue(hsv, i, light) {
+    var value = light ? hsv.v + brightnessStep1 * i : hsv.v - brightnessStep2 * i;
+    return Number(Math.max(0, Math.min(1, value)).toFixed(2));
+  }
+
+  function hexToPalette(hex) {
+    var patterns = [];
+    var primaryColor = hexToHsv(hex);
+    var hsv = primaryColor;
+
+    for (var i = lightColorCount; i > 0; i--) {
+      patterns.push({
+        h: getHue(hsv, i, true),
+        s: getSaturation(hsv, i, true),
+        v: getValue(hsv, i, true)
+      });
+    }
+
+    patterns.push(primaryColor);
+
+    for (var _i2 = 1; _i2 <= darkColorCount; _i2++) {
+      patterns.push({
+        h: getHue(hsv, _i2),
+        s: getSaturation(hsv, _i2),
+        v: getValue(hsv, _i2)
+      });
+    }
+
+    return patterns.map(function (c) {
+      return hsvToHex(c);
+    });
   }
 
   function resolveColor(name) {
@@ -816,9 +990,9 @@ function setupCore(G) {
     }
 
     each([2, 3, 4, 5, 6, 12], function (max) {
-      for (var _i2 = 1; _i2 < max; _i2++) {
-        var name = "".concat(_i2, "/").concat(max);
-        var value = "".concat(+(_i2 * 100 / max).toFixed(6), "%");
+      for (var _i3 = 1; _i3 < max; _i3++) {
+        var name = "".concat(_i3, "/").concat(max);
+        var value = "".concat(+(_i3 * 100 / max).toFixed(6), "%");
         handler(name, value);
       }
     });
@@ -836,6 +1010,7 @@ function setupCore(G) {
     hexToRgb: hexToRgb,
     rgbToHex: rgbToHex,
     resolveColor: resolveColor,
+    hexToPalette: hexToPalette,
     generateColors: generateColors,
     generateSizes: generateSizes,
     resolveClass: resolveClass,
