@@ -1738,7 +1738,7 @@ function setupPaint(G) {
   });
   E(['auto', 'cover', 'contain'], function (v) {
     return R("bg-".concat(v), "background-size: ".concat(v, ";"));
-  }); // Gradient Background 
+  }); // Gradient Background
 
   R("bg-none", "background-image: none;");
   var DM = {
@@ -1891,11 +1891,6 @@ function setupPaint(G) {
     none: '0 0 #0000'
   }, function (v, k) {
     return R("shadow".concat(k == '_' ? '' : "-".concat(k)), "--".concat(P, "-shadow: ").concat(v, ";").concat(bs), initRing);
-  }); //GC('shadow', `--${P}-shadow-color`)
-
-  R("opacity-", function (classDetails) {
-    var parts = classDetails.name.split('-');
-    return "opacity: ".concat(+parts[1] / 100, ";");
   });
   var bms = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'];
   E(bms, function (v) {
@@ -1941,7 +1936,41 @@ function setupPaint(G) {
   }, function (classDetails) {
     var k = classDetails.name.substring(ani.length);
     if (C.keyframes[k]) addInitStyle("@keyframes ".concat(k).concat(C.keyframes[k]));
-  }); // Transform
+  }); // Filters
+
+  var initFilters = function initFilters() {
+    return addInitStyle("*, ::before, ::after {--".concat(P, "-opacity:; --").concat(P, "-hue-rotate:; --").concat(P, "-saturate:; --").concat(P, "-contrast:; --").concat(P, "-blur:; --").concat(P, "-brightness:;}"));
+  };
+
+  var filter = "filter: opacity(var(--".concat(P, "-opacity)) hue-rotate(var(--").concat(P, "-hue-rotate)) saturate(var(--").concat(P, "-saturate)) contrast(var(--").concat(P, "-contrast)) blur(var(--").concat(P, "-blur)) brightness(var(--").concat(P, "-brightness))");
+  R(['opacity-', 'hue-rotate-', 'saturate-', 'contrast-', 'blur', 'brightness-'], function (classDetails) {
+    var cn = classDetails.name.split('-');
+    var name = cn.length > 0 ? cn.slice(0, -1).join('-') : cn[0];
+    var value = cn.slice(-1)[0];
+    if (name === 'opacity') return "".concat(filter, "; --").concat(P, "-").concat(name, ": ").concat(+value / 100, ";");
+    if (name.match('brightness|contrast')) return "".concat(filter, "; --").concat(P, "-").concat(name, ": ").concat(+value / 200 * 2, ";");
+    if (name === 'hue-rotate') return "".concat(filter, "; --").concat(P, "-").concat(name, ": ").concat(value, "deg;");
+    if (name === 'saturate') return "".concat(filter, "; --").concat(P, "-").concat(name, ":  ").concat(+value / 100, ";");
+
+    if (name === 'blur' || name === '') {
+      if (value === 'blur') {
+        return "".concat(filter, "; --").concat(P, "-blur: 8px;");
+      } else if (value == 'none') {
+        return;
+      } else {
+        var b = {
+          none: 0,
+          sm: 4,
+          md: 12,
+          lg: 16,
+          xl: 24,
+          '2xl': 40,
+          '3xl': 64
+        };
+        return "".concat(filter, "; --").concat(P, "-blur: ").concat(b[value], "px;");
+      }
+    }
+  }, initFilters); // Transform
 
   var initTransform = function initTransform() {
     return addInitStyle("*, ::before, ::after {--".concat(P, "-translate-x: 0; --").concat(P, "-translate-y: 0; --").concat(P, "-rotate: 0; --").concat(P, "-skew-x: 0; --").concat(P, "-skew-y: 0; --").concat(P, "-scale-x: 1; --").concat(P, "-scale-y: 1;}"));
@@ -2016,7 +2045,7 @@ function setupPaint(G) {
 
   R("content-[", function (classDetails) {
     return "--".concat(P, "-content: ").concat(EAV(classDetails.name), ";content: var(--").concat(P, "-content);");
-  }); // Outline 
+  }); // Outline
 
   R("outline-none", "outline: 2px solid transparent; outline-offset: 2px;");
   R("outline", "outline-style: solid;");
@@ -2027,7 +2056,7 @@ function setupPaint(G) {
     R("outline-".concat(v), "outline-width: ".concat(v, "px;"));
     R("outline-offset-".concat(v), "outline-offset: ".concat(v, "px;"));
   });
-  GC('outline', "outline-color"); // Interactivity 
+  GC('outline', "outline-color"); // Interactivity
 
   R("appearance-none", "appearance: none;");
   E(['auto', 'default', 'pointer', 'wait', 'text', 'move', 'help', 'not-allowed'], function (v) {
