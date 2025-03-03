@@ -1,4 +1,4 @@
-// Vimesh Style v1.1.6
+// Vimesh Style v1.1.7
 
 function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
@@ -1238,6 +1238,9 @@ function setupPaint(G) {
     if (!font) return null
     return `font-family: ${font};`
   })
+
+  R(`font-[`, (classDetails) => `font-family: ${EAV(classDetails.name)};`)
+
   function sizeWithUnit(s, defUnit = 'rem') {
     return _.isNumeric(s) ? `${s}${defUnit}` : s
   }
@@ -1588,8 +1591,7 @@ function setupPaint(G) {
   R(`not-sr-only`, `position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; white-space: normal;`)
 }
 
-function setupVimeshStyle() {
-    let G = {}
+function setupVimeshStyle(G = {}) {
     setupCore(G)
     setupPreset(G)
     setupLayout(G)

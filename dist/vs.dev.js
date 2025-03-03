@@ -1,4 +1,4 @@
-// Vimesh Style v1.1.6
+// Vimesh Style v1.1.7
 
 function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
@@ -1238,6 +1238,9 @@ function setupPaint(G) {
     if (!font) return null
     return `font-family: ${font};`
   })
+
+  R(`font-[`, (classDetails) => `font-family: ${EAV(classDetails.name)};`)
+
   function sizeWithUnit(s, defUnit = 'rem') {
     return _.isNumeric(s) ? `${s}${defUnit}` : s
   }

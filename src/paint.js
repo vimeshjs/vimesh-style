@@ -19,6 +19,9 @@ function setupPaint(G) {
     if (!font) return null
     return `font-family: ${font};`
   })
+
+  R(`font-[`, (classDetails) => `font-family: ${EAV(classDetails.name)};`)
+
   function sizeWithUnit(s, defUnit = 'rem') {
     return _.isNumeric(s) ? `${s}${defUnit}` : s
   }
