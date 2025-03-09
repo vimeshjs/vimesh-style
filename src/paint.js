@@ -245,14 +245,16 @@ function setupPaint(G) {
 
   // Filters
   const initFilters = () => addInitStyle(`*, ::before, ::after {--${P}-opacity:; --${P}-hue-rotate:; --${P}-saturate:; --${P}-contrast:; --${P}-blur:; --${P}-brightness:;}`)
-  const filter = `filter: opacity(var(--${P}-opacity)) hue-rotate(var(--${P}-hue-rotate)) saturate(var(--${P}-saturate)) contrast(var(--${P}-contrast)) blur(var(--${P}-blur)) brightness(var(--${P}-brightness))`
+  const filterStyle = `filter: opacity(var(--${P}-opacity)) hue-rotate(var(--${P}-hue-rotate)) saturate(var(--${P}-saturate)) contrast(var(--${P}-contrast)) blur(var(--${P}-blur)) brightness(var(--${P}-brightness))`
   R(
-    ['opacity-', 'hue-rotate-', 'saturate-', 'contrast-', 'blur', 'brightness-'],
+    ['backdrop-', 'opacity-', 'hue-rotate-', 'saturate-', 'contrast-', 'blur', 'brightness-'],
     (classDetails) => {
-      const cn = classDetails.name.split('-')
+      let cn = classDetails.name.split('-')
+      const isBackdrop = cn[0] === 'backdrop'
+      if (isBackdrop) cn = cn.slice(1)
       let name = cn.length > 0 ? cn.slice(0, -1).join('-') : cn[0]
       const value = cn.slice(-1)[0]
-
+      const filter = isBackdrop ? `backdrop-${filterStyle}` : filterStyle
       if (name === 'opacity') return `${filter}; --${P}-${name}: ${+value / 100};`
       if (name.match('brightness|contrast')) return `${filter}; --${P}-${name}: ${(+value / 200) * 2};`
 

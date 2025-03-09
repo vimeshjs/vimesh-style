@@ -1,4 +1,4 @@
-// Vimesh Style (ES5) v1.1.7
+// Vimesh Style (ES5) v1.1.8
 "use strict";
 
 function _wrapRegExp() { _wrapRegExp = function _wrapRegExp(re, groups) { return new BabelRegExp(re, void 0, groups); }; var _super = RegExp.prototype, _groups = new WeakMap(); function BabelRegExp(re, flags, groups) { var _this = new RegExp(re, flags); return _groups.set(_this, groups || _groups.get(re)), _setPrototypeOf(_this, BabelRegExp.prototype); } function buildGroups(result, re) { var g = _groups.get(re); return Object.keys(g).reduce(function (groups, name) { return groups[name] = result[g[name]], groups; }, Object.create(null)); } return _inherits(BabelRegExp, RegExp), BabelRegExp.prototype.exec = function (str) { var result = _super.exec.call(this, str); return result && (result.groups = buildGroups(result, this)), result; }, BabelRegExp.prototype[Symbol.replace] = function (str, substitution) { if ("string" == typeof substitution) { var groups = _groups.get(this); return _super[Symbol.replace].call(this, str, substitution.replace(/\$<([^>]+)>/g, function (_, name) { return "$" + groups[name]; })); } if ("function" == typeof substitution) { var _this = this; return _super[Symbol.replace].call(this, str, function () { var args = arguments; return "object" != _typeof(args[args.length - 1]) && (args = [].slice.call(args)).push(buildGroups(args, _this)), substitution.apply(this, args); }); } return _super[Symbol.replace].call(this, str, substitution); }, _wrapRegExp.apply(this, arguments); }
@@ -1205,12 +1205,16 @@ function setupLayout(G) {
   GS(function (name, value) {
     R("w-".concat(name), "width: ".concat(value, ";"));
     R("h-".concat(name), "height: ".concat(value, ";"));
+    R("s-".concat(name), "width: ".concat(value, ";height: ").concat(value, ";"));
   });
   R("w-[", function (classDetails) {
     return "width: ".concat(EAV(classDetails.name), ";");
   });
   R("h-[", function (classDetails) {
     return "height: ".concat(EAV(classDetails.name), ";");
+  });
+  R("s-[", function (classDetails) {
+    return "width: ".concat(EAV(classDetails.name), ";height: ").concat(EAV(classDetails.name), ";");
   }); // Min & Max Width
 
   var ws = {
@@ -1945,11 +1949,14 @@ function setupPaint(G) {
     return addInitStyle("*, ::before, ::after {--".concat(P, "-opacity:; --").concat(P, "-hue-rotate:; --").concat(P, "-saturate:; --").concat(P, "-contrast:; --").concat(P, "-blur:; --").concat(P, "-brightness:;}"));
   };
 
-  var filter = "filter: opacity(var(--".concat(P, "-opacity)) hue-rotate(var(--").concat(P, "-hue-rotate)) saturate(var(--").concat(P, "-saturate)) contrast(var(--").concat(P, "-contrast)) blur(var(--").concat(P, "-blur)) brightness(var(--").concat(P, "-brightness))");
-  R(['opacity-', 'hue-rotate-', 'saturate-', 'contrast-', 'blur', 'brightness-'], function (classDetails) {
+  var filterStyle = "filter: opacity(var(--".concat(P, "-opacity)) hue-rotate(var(--").concat(P, "-hue-rotate)) saturate(var(--").concat(P, "-saturate)) contrast(var(--").concat(P, "-contrast)) blur(var(--").concat(P, "-blur)) brightness(var(--").concat(P, "-brightness))");
+  R(['backdrop-', 'opacity-', 'hue-rotate-', 'saturate-', 'contrast-', 'blur', 'brightness-'], function (classDetails) {
     var cn = classDetails.name.split('-');
+    var isBackdrop = cn[0] === 'backdrop';
+    if (isBackdrop) cn = cn.slice(1);
     var name = cn.length > 0 ? cn.slice(0, -1).join('-') : cn[0];
     var value = cn.slice(-1)[0];
+    var filter = isBackdrop ? "backdrop-".concat(filterStyle) : filterStyle;
     if (name === 'opacity') return "".concat(filter, "; --").concat(P, "-").concat(name, ": ").concat(+value / 100, ";");
     if (name.match('brightness|contrast')) return "".concat(filter, "; --").concat(P, "-").concat(name, ": ").concat(+value / 200 * 2, ";");
     if (name === 'hue-rotate') return "".concat(filter, "; --").concat(P, "-").concat(name, ": ").concat(value, "deg;");

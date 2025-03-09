@@ -61,9 +61,11 @@ function setupLayout(G) {
     GS((name, value) => {
         R(`w-${name}`, `width: ${value};`)
         R(`h-${name}`, `height: ${value};`)
+        R(`s-${name}`, `width: ${value};height: ${value};`)
     })
     R(`w-[`, classDetails => `width: ${EAV(classDetails.name)};`)
     R(`h-[`, classDetails => `height: ${EAV(classDetails.name)};`)
+    R(`s-[`, classDetails => `width: ${EAV(classDetails.name)};height: ${EAV(classDetails.name)};`)
 
     // Min & Max Width
     const ws = { '0': '0px', full: '100%', min: 'min-content', max: 'max-content', fit: 'fit-content' }
