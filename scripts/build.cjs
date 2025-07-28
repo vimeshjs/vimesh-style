@@ -11,13 +11,22 @@ if (!fs.existsSync(dirDist)) fs.mkdirSync(dirDist)
 
 let files = ['core.js', 'preset.js', 'layout.js', 'paint.js']
 
-let code = _.map(files, f => fs.readFileSync(`${dirSrc}/${f}`)).join('')
+// Function to clean CommonJS exports from file content
+function cleanModuleExports(content) {
+    // Remove CommonJS export statements
+    return content.replace(/\s*if\s*\(\s*typeof\s+module\s*!==\s*['"]undefined['"]\s*\)\s*module\.exports\s*=\s*\w+\s*$/gm, '');
+}
+
+let code = _.map(files, f => cleanModuleExports(fs.readFileSync(`${dirSrc}/${f}`, 'utf8'))).join('')
 const processors = {
     '.dev': js => js,
     '': js => UglifyJS.minify(js).code
 }
 function buildBrowserEs5() {
-    let code = _.map(files, f => babel.transformSync(fs.readFileSync(`${dirSrc}/${f}`), { presets: ['@babel/preset-env'] }).code).join('')
+    let code = _.map(files, f => {
+        const cleanedContent = cleanModuleExports(fs.readFileSync(`${dirSrc}/${f}`, 'utf8'));
+        return babel.transformSync(cleanedContent, { presets: ['@babel/preset-env'] }).code;
+    }).join('')
     _.each(processors, (func, type) => {
         let result = `// Vimesh Style (ES5) v${version}\r\n` + func(code + fs.readFileSync(`${__dirname}/index.js`))
         fs.writeFileSync(`${dirDist}/vs${type}.es5.js`, result)

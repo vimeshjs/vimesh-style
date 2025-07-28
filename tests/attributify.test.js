@@ -1,9 +1,10 @@
-const { normalizeCss, sleep } = require('./utils')
+const { normalizeCss, sleep, setupTestEnvironment } = require('./utils')
 
 test('resolve attributify values into styles', async () => {
-    require('../dist/vs')
+    const $vs = setupTestEnvironment();
+
     $vs.config.attributify = 'all'
-    const expectedCssOutput = normalizeCss($vs.config.preset + `
+    const expectedCssOutput = normalizeCss(($vs.config.preset || '') + `
     *,
      ::before,
      ::after {

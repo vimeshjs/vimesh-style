@@ -1,7 +1,19 @@
 const { normalizeCss } = require('./utils')
-const setupVimeshStyle = require('@vimesh/style')
-const $vs = setupVimeshStyle()
+const setupCore = require('../src/core');
+const setupLayout = require('../src/layout');
+const setupPaint = require('../src/paint');
+const setupPreset = require('../src/preset');
 
+// Create global object for SSR mode (no window/document)
+const G = {}
+
+// Setup all modules
+setupCore(G);
+setupLayout(G);
+setupPaint(G);
+setupPreset(G);
+
+const $vs = G.$vs
 
 test('generate css classes from html', () => {
     let expectedCssOutput = normalizeCss(`
@@ -28,7 +40,7 @@ test('generate css classes from html', () => {
 
     expect(cssOutput).toBe(expectedCssOutput)
 
-    expectedCssOutput = normalizeCss(preset + expectedCssOutput)
+    expectedCssOutput = normalizeCss((preset || '') + expectedCssOutput)
     $vs.config.preset = preset
     $vs.reset()
     $vs.add($vs.extract(html))

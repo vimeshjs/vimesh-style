@@ -151,7 +151,7 @@ function setupCore(G) {
     let initMap = {}
     let autoStyles = {}
     let initStyles = []
-    let macroCss = []
+    // Removed macroCss - component styles will be registered as regular classes
     let rootVars = {}
     let styleElement = null
     let stylesOutput = null
@@ -160,6 +160,7 @@ function setupCore(G) {
     let cacheDecompose = {}
     let knownAttributes = {}
     let resetListeners = []
+    let classDependencies = {}  // Store class dependencies
     each(KNOWN_ATTR_NAMES.split(','), a => knownAttributes[a] = true)
     const BP_MIN_TPL = "@media (min-width: ${width}) {\n  ${style} \n}"
     const BP_MAX_TPL = "@media not all and (min-width: ${width}) {\n  ${style} \n}"
@@ -361,23 +362,368 @@ function setupCore(G) {
         }
         return result
     }
-    function register(keys, generatorOrStyle, initFunc) {
-        if (!generatorOrStyle) return
-        if (!isArray(keys)) keys = [keys]
-        if (isFunction(generatorOrStyle))
-            each(keys, key => generators.unshift({ prefix: key, generator: generatorOrStyle, init: initFunc }))
-        else
-            each(keys, key => {
-                classMap[key] = generatorOrStyle;
-                if (initFunc) initMap[key] = initFunc
+    // Cache for processed @apply directives
+    const applyCache = new Map()
+    
+    /**
+     * Parse CSS string into object format
+     * @param {string} cssStr - CSS string like "color:red;font-size:16px"
+     * @returns {Object} Object with CSS properties
+     */
+    function parseCssString(cssStr) {
+        const styles = {}
+        if (!cssStr) return styles
+        
+        const props = cssStr.split(';').filter(Boolean)
+        for (let i = 0; i < props.length; i++) {
+            const colonIndex = props[i].indexOf(':')
+            if (colonIndex > 0) {
+                const propName = props[i].substring(0, colonIndex).trim()
+                const propValue = props[i].substring(colonIndex + 1).trim()
+                styles[propName] = propValue
+            }
+        }
+        return styles
+    }
+    
+    /**
+     * Process @apply directive with caching and optimizations
+     * @param {Object} styleObj - Style object that may contain @apply directives
+     * @param {Set} visitedClasses - Set of classes being processed (for circular dependency detection)
+     * @returns {Object} Processed style object with @apply resolved
+     */
+    function processApplyDirective(styleObj, visitedClasses = new Set()) {
+        if (!isPlainObject(styleObj)) return styleObj
+        
+        // Quick check if object has @apply
+        let hasApply = false
+        for (let key in styleObj) {
+            if (key === '@apply') {
+                hasApply = true
+                break
+            }
+        }
+        
+        // If no @apply, just handle nested objects
+        if (!hasApply) {
+            let result = {}
+            each(styleObj, (value, key) => {
+                result[key] = isPlainObject(value) ? processApplyDirective(value, visitedClasses) : value
             })
+            return result
+        }
+        
+        // Check cache
+        const cacheKey = styleObj['@apply']
+        if (cacheKey && applyCache.has(cacheKey) && visitedClasses.size === 0) {
+            const cached = applyCache.get(cacheKey)
+            return { ...cached, ...styleObj }
+        }
+        
+        let result = {}
+        let applyStyles = {}
+        
+        // Process all properties
+        each(styleObj, (value, key) => {
+            if (key === '@apply') {
+                const classes = value.split(/\s+/).filter(Boolean)
+                for (let i = 0; i < classes.length; i++) {
+                    const className = classes[i]
+                    
+                    // Check for circular dependencies
+                    if (visitedClasses.has(className)) {
+                        if (C.debug) console.warn(`Circular @apply reference detected: ${className}`)
+                        continue
+                    }
+                    
+                    // Add to visited set for this resolution chain
+                    visitedClasses.add(className)
+                    
+                    // Resolve the class
+                    const resolved = resolveClass(className)
+                    if (resolved) {
+                        if (isString(resolved)) {
+                            Object.assign(applyStyles, parseCssString(resolved))
+                        } else if (isPlainObject(resolved)) {
+                            if (resolved.style) {
+                                Object.assign(applyStyles, parseCssString(resolved.style))
+                            } else {
+                                // Direct object styles (not wrapped in { style: ... })
+                                Object.assign(applyStyles, resolved)
+                            }
+                        }
+                    } else if (C.debug) {
+                        console.warn(`@apply: Cannot resolve class "${className}"`)
+                    }
+                    
+                    // Remove from visited set after processing
+                    visitedClasses.delete(className)
+                }
+            } else if (isPlainObject(value)) {
+                // Recursively process nested objects
+                result[key] = processApplyDirective(value, visitedClasses)
+            } else {
+                result[key] = value
+            }
+        })
+        
+        // Merge @apply styles with other properties
+        result = { ...applyStyles, ...result }
+        
+        // Cache the result if no circular dependencies
+        if (cacheKey && visitedClasses.size === 0) {
+            applyCache.set(cacheKey, { ...applyStyles })
+        }
+        
+        return result
+    }
+    // Pre-compiled regex patterns for better performance
+    const SIMPLE_CLASS_REGEX = /^\.([a-zA-Z0-9_-]+)$/
+    const PSEUDO_SELECTOR_REGEX = /^(\.[a-zA-Z0-9_-]+)(:[a-zA-Z-]+|\:\:[a-zA-Z-]+|\.[\w-]+)/
+    const COMPOUND_SELECTOR_REGEX = /^(\.[a-zA-Z0-9_-]+)\s+/
+    
+    // Helper to add dependency using Set for O(1) lookups
+    function addDependency(className, selector) {
+        if (!classDependencies[className]) {
+            classDependencies[className] = []
+        }
+        if (!classDependencies[className].includes(selector)) {
+            classDependencies[className].push(selector)
+        }
+    }
+    
+    // Helper to register selector dependencies
+    function registerSelectorDependencies(selector) {
+        if (!selector.startsWith('.')) return
+        
+        const pseudoMatch = selector.match(PSEUDO_SELECTOR_REGEX)
+        const compoundMatch = selector.match(COMPOUND_SELECTOR_REGEX)
+        
+        if (pseudoMatch) {
+            // Handle pseudo-class/pseudo-element dependencies
+            const baseClass = pseudoMatch[1].replace('.', '')
+            addDependency(baseClass, selector)
+        } else if (compoundMatch) {
+            // Handle compound selector dependencies
+            const parentClass = compoundMatch[1].replace('.', '')
+            addDependency(parentClass, selector)
+        }
+    }
+    
+    /**
+     * Register CSS classes or component styles
+     * @param {string|Array|Object} keys - Class name(s) or selector->styles mapping
+     * @param {string|Object|Function} generatorOrStyle - CSS string, style object, or generator function
+     * @param {Function} initFunc - Optional initialization function
+     * 
+     * @example
+     * // Register utility class
+     * register('btn', 'display:block;')
+     * 
+     * // Register with generator
+     * register('text-', (details) => `color:${details.value}`)
+     * 
+     * // Register component styles
+     * register({
+     *   '.btn': { '@apply': 'px-4 py-2', cursor: 'pointer' },
+     *   '.btn:hover': { transform: 'scale(0.95)' }
+     * })
+     */
+    function register(keys, generatorOrStyle, initFunc) {
+        // Handle single object parameter (selector -> styles mapping)
+        if (isPlainObject(keys) && arguments.length === 1) {
+            // Collect all selectors and register them as interdependent
+            const allSelectors = Object.keys(keys)
+            const classSelectors = []
+            
+            // Extract all class selectors (excluding compound selectors and pseudo-elements)
+            for (let i = 0; i < allSelectors.length; i++) {
+                const selector = allSelectors[i]
+                const match = selector.match(SIMPLE_CLASS_REGEX)
+                if (match) {
+                    classSelectors.push({
+                        selector: selector,
+                        className: match[1]
+                    })
+                }
+            }
+            
+            // Register all class selectors as dependencies of each other
+            // This means when any class is used, all related classes in the DOM will be processed
+            if (classSelectors.length > 1) {
+                for (let i = 0; i < classSelectors.length; i++) {
+                    const { className } = classSelectors[i]
+                    for (let j = 0; j < allSelectors.length; j++) {
+                        const depSelector = allSelectors[j]
+                        if (depSelector !== '.' + className) {
+                            addDependency(className, depSelector)
+                        }
+                    }
+                }
+            }
+            
+            // First pass: register all selectors properly and extract media queries
+            const selectorStyles = []
+            each(keys, (styles, selector) => {
+                if (selector.startsWith('.')) {
+                    // Check if styles contain media queries
+                    if (isPlainObject(styles)) {
+                        const baseStyles = {}
+                        const mediaQueries = {}
+                        
+                        // Separate base styles from media queries
+                        each(styles, (value, key) => {
+                            if (key.startsWith('@media')) {
+                                mediaQueries[key] = value
+                            } else {
+                                baseStyles[key] = value
+                            }
+                        })
+                        
+                        // Register base styles
+                        selectorStyles.push({ selector, styles: baseStyles })
+                        
+                        // Register media query styles as separate selectors
+                        each(mediaQueries, (mediaStyles, mediaQuery) => {
+                            // Create media query selector like "@media (min-width: 640px) .selector"
+                            const mediaSelector = `${mediaQuery} ${selector}`
+                            selectorStyles.push({ selector: mediaSelector, styles: mediaStyles })
+                        })
+                    } else {
+                        selectorStyles.push({ selector, styles })
+                    }
+                }
+                // Register additional dependencies using helper
+                registerSelectorDependencies(selector)
+            })
+            
+            // Group selectors by base class name
+            const selectorsByClass = {}
+            selectorStyles.forEach(({ selector, styles }) => {
+                let className
+                if (selector.startsWith('@media')) {
+                    // Extract class name from media query selector
+                    const match = selector.match(/@media[^{]+\s+\.([a-zA-Z0-9_-]+)/)
+                    className = match ? match[1] : selector
+                } else {
+                    className = selector.substring(1).split(/[\s:>\+~\[]/)[0]
+                }
+                
+                if (!selectorsByClass[className]) {
+                    selectorsByClass[className] = []
+                }
+                selectorsByClass[className].push({ selector, styles })
+            })
+            
+            // Register each base class with all its related selectors
+            each(selectorsByClass, (selectors, className) => {
+                classMap[className] = () => {
+                    // When this class is used, generate styles for ALL its selectors
+                    const results = []
+                    selectors.forEach(({ selector, styles }) => {
+                        let processedStyles = styles
+                        
+                        if (isPlainObject(styles)) {
+                            // Process @apply directive if present
+                            processedStyles = processApplyDirective(styles)
+                        }
+                        
+                        // Handle media query selectors specially
+                        if (selector.startsWith('@media')) {
+                            // Extract media query and class selector
+                            const match = selector.match(/^(@media[^{]+)\s+(\..+)$/)
+                            if (match) {
+                                const [, mediaQuery, classSelector] = match
+                                const styleString = isPlainObject(processedStyles) 
+                                    ? buildCssString(processedStyles) 
+                                    : processedStyles
+                                
+                                results.push({
+                                    selector: mediaQuery,
+                                    style: `${classSelector} { ${styleString} }`
+                                })
+                            }
+                        } else {
+                            results.push({
+                                selector: selector,
+                                style: isPlainObject(processedStyles) 
+                                    ? buildCssString(processedStyles) 
+                                    : processedStyles
+                            })
+                        }
+                    })
+                    // Return array of all selector styles
+                    return results
+                }
+            })
+            return
+        }
+        
+        if (generatorOrStyle === null || generatorOrStyle === undefined) return
+        if (!isArray(keys)) keys = [keys]
+        if (isFunction(generatorOrStyle)) {
+            each(keys, key => generators.unshift({ prefix: key, generator: generatorOrStyle, init: initFunc }))
+        } else {
+            // Create generator functions for style objects to enable dynamic @apply processing
+            each(keys, key => {
+                if (isPlainObject(generatorOrStyle)) {
+                    // Check if styles contain @apply
+                    const hasApply = '@apply' in generatorOrStyle
+                    classMap[key] = hasApply 
+                        ? () => processApplyDirective(generatorOrStyle)  // Dynamic processing
+                        : processApplyDirective(generatorOrStyle)         // Process once
+                } else {
+                    classMap[key] = generatorOrStyle
+                }
+                if (initFunc) initMap[key] = initFunc
+                
+                // Auto-register dependencies for pseudo-classes and pseudo-elements
+                if (key.includes(':') || key.includes('::')) {
+                    const pseudoMatch = key.match(/^([a-zA-Z0-9_-]+)(:[a-zA-Z-]+|::[a-zA-Z-]+)/)
+                    if (pseudoMatch) {
+                        const baseClass = pseudoMatch[1]
+                        if (!classDependencies[baseClass]) {
+                            classDependencies[baseClass] = []
+                        }
+                        if (!classDependencies[baseClass].includes(key)) {
+                            classDependencies[baseClass].push(key)
+                        }
+                    }
+                }
+            })
+        }
     }
     function resolveClass(className) {
         if (!className) return null
+        
+        // First try to resolve the full className (for cases like 'card:hover')
+        let style = classMap[className]
+        if (style) {
+            // If style is a function (generator), call it with decomposed details
+            if (isFunction(style)) {
+                let classDetails = decomposeClassName(className)
+                style = style(classDetails)
+            }
+            if (style && initMap[className]) {
+                let classDetails = decomposeClassName(className)
+                initMap[className](classDetails)
+            }
+            return style
+        }
+        
+        // If not found, decompose and try base name
         let classDetails = decomposeClassName(className)
         let cdn = classDetails.name
-        let style = classMap[cdn]
+        style = classMap[cdn]
+        
+        // If style is a function (generator), call it to get the actual style
+        if (isFunction(style)) {
+            style = style(classDetails)
+        }
+        
         if (style && initMap[cdn]) initMap[cdn](classDetails)
+        
+        // Try generators if no direct class mapping found
         for (let i = 0; !style && i < generators.length; i++) {
             let gi = generators[i]
             if (cdn.indexOf(gi.prefix) == 0) {
@@ -385,48 +731,58 @@ function setupCore(G) {
                 if (style && gi.init) gi.init(classDetails)
             }
         }
+        
         if (!style && C.debug) console.log(`Unknown class: ${className}`)
         return style
     }
-    function addMacroCss(css) {
-        if (isPlainObject(css))
-            macroCss.push(css)
-        else if (isArray(css))
-            macroCss.push(...css)
-    }
+    // Removed addMacroCss - no longer needed
     function addRootVars(vars) {
         rootVars = { ...rootVars, ...vars }
+    }
+    
+    // CSS builder utility for efficient string concatenation
+    function buildCssString(styleObj) {
+        const props = []
+        for (const prop in styleObj) {
+            if (styleObj.hasOwnProperty(prop)) {
+                // Skip media queries and other nested objects - they should be handled separately
+                if (!prop.startsWith('@') && !isPlainObject(styleObj[prop])) {
+                    props.push(`${prop}:${styleObj[prop]}`)
+                }
+            }
+        }
+        return props.length ? props.join(';') + ';' : ''
     }
     function updateAutoStyles() {
         let keys = Object.keys(autoStyles).sort((a, b) => (C.breakpoints[a] || 0) - (C.breakpoints[b] || 0))
         let all = initStyles
         each(keys, k => all = all.concat(autoStyles[k]))
-        let macroStyles = []
-        each(macroCss, css => {
-            each(css, (macro, selectors) => {
-                let extended = macro.split(' ').map(cls => resolveClass(cls)).join('')
-                macroStyles.push(`${selectors} {${extended}}`)
-            })
-        })
+        // Removed macro styles processing - components are now registered as regular classes
         let varDefs = []
         each(rootVars, (v, k) => {
             if (!k.startsWith('--')) k = '--' + k
             varDefs.push(`${k}:${v};`)
         })
         if (varDefs.length > 0) {
-            macroStyles.push(`:root{\n${varDefs.join('\n')}\n}`)
+            all.push(`:root{\n${varDefs.join('\n')}\n}`)
         }
-        all = all.concat(macroStyles)
+        // Macro styles are now handled as regular classes
         if (all.length > 0) {
             let newStyles = (C.preset ? [C.preset] : []).concat(all).join('\n')
             if (newStyles !== stylesOutput) {
+                stylesOutput = newStyles
                 if (G.document) {
-                    if (styleElement)
-                        styleElement.innerHTML = stylesOutput = newStyles
-                    else
+                    if (styleElement) {
+                        styleElement.innerHTML = newStyles
+                    } else {
                         setTimeout(updateAutoStyles)
-                } else {
-                    stylesOutput = newStyles
+                    }
+                    // Remove vs-cloak from all elements after styles are loaded
+                    if (!$vs.config._vsCloakRemoved && newStyles) {
+                        $vs.config._vsCloakRemoved = true
+                        const cloakedElements = G.document.querySelectorAll('[vs-cloak]')
+                        cloakedElements.forEach(el => el.removeAttribute('vs-cloak'))
+                    }
                 }
             }
         }
@@ -448,27 +804,70 @@ function setupCore(G) {
             each(classes, name => {
                 name = name.trim()
                 if (!name || addedClasses[name]) return
-                let style = resolveClass(name)
-                if (style) {
-                    let surfix = ''
-                    if (style.name) {
-                        if (style.name.indexOf('$') == 0) {
-                            surfix = style.name.substring(1)
+                
+                // Check for class dependencies
+                if (classDependencies[name]) {
+                    // Generate dependent classes
+                    const deps = Array.isArray(classDependencies[name]) 
+                        ? classDependencies[name] 
+                        : Array.from(classDependencies[name])
+                    
+                    deps.forEach(dep => {
+                        if (!addedClasses[dep]) {
+                            // Recursively add dependent classes with original dependency name
+                            addClasses([dep], false)
                         }
-                        style = style.style
+                    })
+                }
+                
+                let style = resolveClass(name)
+                if (style !== null && style !== undefined) {
+                    // Handle array of styles (from multi-selector registration)
+                    if (isArray(style)) {
+                        addedClasses[name] = true
+                        let bpStyles = autoStyles['']
+                        if (!bpStyles) bpStyles = autoStyles[''] = []
+                        style.forEach(item => {
+                            if (item.selector && item.style) {
+                                bpStyles.push(`${item.selector} {${item.style}}`)
+                            }
+                        })
+                    } else {
+                        let surfix = ''
+                        // Handle component selector format
+                        if (style.selector && style.style) {
+                            // This is from object syntax registration
+                            addedClasses[name] = true
+                            let bpStyles = autoStyles['']
+                            if (!bpStyles) bpStyles = autoStyles[''] = []
+                            bpStyles.push(`${style.selector} {${style.style}}`)
+                        } else {
+                            // Original logic for regular classes
+                            if (style.name) {
+                                if (style.name.indexOf('$') == 0) {
+                                    surfix = style.name.substring(1)
+                                }
+                                style = style.style
+                            }
+                            // Convert style object to CSS string if needed
+                            if (isPlainObject(style)) {
+                                style = buildCssString(style)
+                            }
+                            let classDetails = decomposeClassName(name, surfix)
+                            style = classDetails.template.replace('${style}', style)
+                            addedClasses[name] = true
+                            let bpStyles = autoStyles[classDetails.breakpoint || '']
+                            if (!bpStyles) bpStyles = autoStyles[classDetails.breakpoint || ''] = []
+                            bpStyles.push(style)
+                        }
                     }
-                    let classDetails = decomposeClassName(name, surfix)
-                    style = classDetails.template.replace('${style}', style)
-                    addedClasses[name] = true
-                    let bpStyles = autoStyles[classDetails.breakpoint || '']
-                    if (!bpStyles) bpStyles = autoStyles[classDetails.breakpoint || ''] = []
-                    bpStyles.push(style)
                 }
             })
-            if (update) updateAutoStyles()
         }
+        if (update) updateAutoStyles()
     }
-    function recordKnownClasses(el, update = true) {
+    
+    function recordKnownClasses(el) {
         const prefix = C.prefix + ':'
         let classes = []
         let classesFromAttrs = []
@@ -478,6 +877,23 @@ function setupCore(G) {
             // SVGAnimatedString
             if (cn.baseVal) classes.push(cn.baseVal)
             if (cn.animVal) classes.push(cn.animVal)
+        }
+        
+        // Check for compound selectors
+        const elClasses = Array.from(el.classList || [])
+        const parent = el.parentElement
+        if (parent) {
+            const parentClasses = Array.from(parent.classList || [])
+            parentClasses.forEach(parentCls => {
+                elClasses.forEach(childCls => {
+                    const compound = `${parentCls} ${childCls}`
+                    if (classDependencies[compound]) {
+                        classDependencies[compound].forEach(depCls => {
+                            classes.push(depCls)
+                        })
+                    }
+                })
+            })
         }
         each(el.attributes, a => {
             let prop = a.name
@@ -563,6 +979,7 @@ function setupCore(G) {
         autoStyles = {}
         stylesOutput = null
         cache = {}
+        $vs.config._vsCloakRemoved = false // Reset cloak removal flag
         if (styleElement) {
             styleElement.innerHTML = null
             if (C.auto && G.document) resolveAll(G.document.body)
@@ -597,6 +1014,221 @@ function setupCore(G) {
     function rgbToHex(rgb) {
         let { r, g, b } = rgb
         return ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
+    }
+
+    // Parse CSS color values (hex, rgb, rgba, hsl, hsla, CSS variables)
+    function parseColor(color) {
+        if (!color || typeof color !== 'string') return null
+        color = color.trim()
+        
+        // Handle CSS variables
+        if (color.startsWith('var(')) {
+            const match = color.match(/var\(([^)]+)\)/)
+            if (match && G.getComputedStyle) {
+                const varName = match[1].trim()
+                const computed = G.getComputedStyle(G.document.documentElement).getPropertyValue(varName)
+                if (computed) return parseColor(computed)
+            }
+            return null
+        }
+        
+        // Handle hex colors
+        if (color[0] === '#') {
+            const rgb = hexToRgb(color)
+            if (rgb) return { ...rgb, a: 1 }
+        }
+        
+        // Handle rgb/rgba
+        const rgbMatch = color.match(/rgba?\((\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?)(?:,\s*(\d+(?:\.\d+)?))?\)/)
+        if (rgbMatch) {
+            return {
+                r: Math.round(parseFloat(rgbMatch[1])),
+                g: Math.round(parseFloat(rgbMatch[2])),
+                b: Math.round(parseFloat(rgbMatch[3])),
+                a: rgbMatch[4] ? parseFloat(rgbMatch[4]) : 1
+            }
+        }
+        
+        // Handle hsl/hsla
+        const hslMatch = color.match(/hsla?\((\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?)%,\s*(\d+(?:\.\d+)?)%(?:,\s*(\d+(?:\.\d+)?))?\)/)
+        if (hslMatch) {
+            const h = parseFloat(hslMatch[1]) / 360
+            const s = parseFloat(hslMatch[2]) / 100
+            const l = parseFloat(hslMatch[3]) / 100
+            const a = hslMatch[4] ? parseFloat(hslMatch[4]) : 1
+            
+            const rgb = hslToRgb(h, s, l)
+            return { ...rgb, a }
+        }
+        
+        // Handle named colors (basic set)
+        const namedColors = {
+            transparent: { r: 0, g: 0, b: 0, a: 0 },
+            white: { r: 255, g: 255, b: 255, a: 1 },
+            black: { r: 0, g: 0, b: 0, a: 1 },
+            red: { r: 255, g: 0, b: 0, a: 1 },
+            green: { r: 0, g: 128, b: 0, a: 1 },
+            blue: { r: 0, g: 0, b: 255, a: 1 },
+            // Add more as needed
+        }
+        
+        if (namedColors[color.toLowerCase()]) {
+            return namedColors[color.toLowerCase()]
+        }
+        
+        return null
+    }
+    
+    // Convert HSL to RGB
+    function hslToRgb(h, s, l) {
+        let r, g, b
+        
+        if (s === 0) {
+            r = g = b = l // Achromatic
+        } else {
+            const hue2rgb = (p, q, t) => {
+                if (t < 0) t += 1
+                if (t > 1) t -= 1
+                if (t < 1/6) return p + (q - p) * 6 * t
+                if (t < 1/2) return q
+                if (t < 2/3) return p + (q - p) * (2/3 - t) * 6
+                return p
+            }
+            
+            const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+            const p = 2 * l - q
+            r = hue2rgb(p, q, h + 1/3)
+            g = hue2rgb(p, q, h)
+            b = hue2rgb(p, q, h - 1/3)
+        }
+        
+        return {
+            r: Math.round(r * 255),
+            g: Math.round(g * 255),
+            b: Math.round(b * 255)
+        }
+    }
+    
+    // Convert RGB to HSL
+    function rgbToHsl(r, g, b) {
+        r /= 255
+        g /= 255
+        b /= 255
+        
+        const max = Math.max(r, g, b)
+        const min = Math.min(r, g, b)
+        let h, s, l = (max + min) / 2
+        
+        if (max === min) {
+            h = s = 0 // Achromatic
+        } else {
+            const d = max - min
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+            
+            switch (max) {
+                case r: h = (g - b) / d + (g < b ? 6 : 0); break
+                case g: h = (b - r) / d + 2; break
+                case b: h = (r - g) / d + 4; break
+            }
+            
+            h /= 6
+        }
+        
+        return { h: h * 360, s: s * 100, l: l * 100 }
+    }
+    
+    // Mix two colors (similar to CSS color-mix)
+    function colorMix(color1, color2, amount = 50, colorSpace = 'srgb') {
+        const c1 = typeof color1 === 'string' ? parseColor(color1) : color1
+        const c2 = typeof color2 === 'string' ? parseColor(color2) : color2
+        
+        if (!c1 || !c2) return null
+        
+        const ratio = amount / 100
+        const invRatio = 1 - ratio
+        
+        if (colorSpace === 'srgb' || colorSpace === 'rgb') {
+            // Mix in RGB space
+            return {
+                r: Math.round(c1.r * ratio + c2.r * invRatio),
+                g: Math.round(c1.g * ratio + c2.g * invRatio),
+                b: Math.round(c1.b * ratio + c2.b * invRatio),
+                a: c1.a * ratio + c2.a * invRatio
+            }
+        } else if (colorSpace === 'hsl') {
+            // Mix in HSL space
+            const hsl1 = rgbToHsl(c1.r, c1.g, c1.b)
+            const hsl2 = rgbToHsl(c2.r, c2.g, c2.b)
+            
+            // Handle hue interpolation (shortest path)
+            let h1 = hsl1.h
+            let h2 = hsl2.h
+            const diff = Math.abs(h1 - h2)
+            if (diff > 180) {
+                if (h1 > h2) h2 += 360
+                else h1 += 360
+            }
+            
+            const mixedHsl = {
+                h: (h1 * ratio + h2 * invRatio) % 360,
+                s: hsl1.s * ratio + hsl2.s * invRatio,
+                l: hsl1.l * ratio + hsl2.l * invRatio
+            }
+            
+            const rgb = hslToRgb(mixedHsl.h / 360, mixedHsl.s / 100, mixedHsl.l / 100)
+            return {
+                ...rgb,
+                a: c1.a * ratio + c2.a * invRatio
+            }
+        }
+        
+        // Default to RGB mixing
+        return colorMix(color1, color2, amount, 'srgb')
+    }
+    
+    // Adjust color lightness
+    function adjustLightness(color, amount) {
+        const c = typeof color === 'string' ? parseColor(color) : color
+        if (!c) return null
+        
+        const hsl = rgbToHsl(c.r, c.g, c.b)
+        hsl.l = Math.max(0, Math.min(100, hsl.l + amount))
+        
+        const rgb = hslToRgb(hsl.h / 360, hsl.s / 100, hsl.l / 100)
+        return { ...rgb, a: c.a }
+    }
+    
+    // Adjust color saturation
+    function adjustSaturation(color, amount) {
+        const c = typeof color === 'string' ? parseColor(color) : color
+        if (!c) return null
+        
+        const hsl = rgbToHsl(c.r, c.g, c.b)
+        hsl.s = Math.max(0, Math.min(100, hsl.s + amount))
+        
+        const rgb = hslToRgb(hsl.h / 360, hsl.s / 100, hsl.l / 100)
+        return { ...rgb, a: c.a }
+    }
+    
+    // Darken color (convenience function)
+    function darken(color, amount = 10) {
+        return colorMix(color, 'black', 100 - amount)
+    }
+    
+    // Lighten color (convenience function)
+    function lighten(color, amount = 10) {
+        return colorMix(color, 'white', 100 - amount)
+    }
+    
+    // Convert color to CSS string
+    function colorToString(color) {
+        if (!color) return null
+        if (typeof color === 'string') return color
+        
+        if (color.a !== undefined && color.a < 1) {
+            return `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`
+        }
+        return `#${rgbToHex(color)}`
     }
 
     function hexToHsv(hex) {
@@ -763,6 +1395,7 @@ function setupCore(G) {
                 cv = color[index - 1]
             }
         }
+        
         if (cv && cv[0] === '#') {
             cv = hexToRgb(cv)
             if (alpha !== null) cv.a = alpha
@@ -781,6 +1414,7 @@ function setupCore(G) {
             let color = classDetails.name.substring(classNamePrefix.length + 1)
             let cv = resolveColor(color)
             if (!cv) return null
+            // Keep original behavior for opacity variable compatibility
             let style = isString(cv) ? `${styleName}: ${cv};` : `${undefined === cv.a ? `${vn}:1;` : ''}${styleName}: rgba(${cv.r},${cv.g},${cv.b},${undefined === cv.a ? `var(${vn})` : cv.a});`
             return nameAffix ? { name: `$${nameAffix}`, style } : style
         })
@@ -811,6 +1445,15 @@ function setupCore(G) {
     extend($vs._, {
         hexToRgb,
         rgbToHex,
+        parseColor,
+        hslToRgb,
+        rgbToHsl,
+        colorMix,
+        adjustLightness,
+        adjustSaturation,
+        darken,
+        lighten,
+        colorToString,
         resolveColor,
         hexToPalette,
         generateColors,
@@ -825,7 +1468,6 @@ function setupCore(G) {
         reset: resetStyles,
         extract: extractClasses,
         add: addClasses,
-        addMacroCss,
         addRootVars,
         resolveAll,
         register
@@ -873,3 +1515,4 @@ function setupCore(G) {
         })
     }
 }
+if (typeof module !== 'undefined') module.exports = setupCore

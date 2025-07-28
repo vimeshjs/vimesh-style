@@ -339,3 +339,4 @@ function setupLayout(G) {
     R(`table-fixed`, `table-layout: fixed;`)
 
 }
+if (typeof module !== 'undefined') module.exports = setupLayout

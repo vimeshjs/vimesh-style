@@ -1,4 +1,4 @@
-// Vimesh Style (ES5) v1.1.9
+// Vimesh Style (ES5) v1.2.0
 "use strict";
 
 function _wrapRegExp() { _wrapRegExp = function _wrapRegExp(re, groups) { return new BabelRegExp(re, void 0, groups); }; var _super = RegExp.prototype, _groups = new WeakMap(); function BabelRegExp(re, flags, groups) { var _this = new RegExp(re, flags); return _groups.set(_this, groups || _groups.get(re)), _setPrototypeOf(_this, BabelRegExp.prototype); } function buildGroups(result, re) { var g = _groups.get(re); return Object.keys(g).reduce(function (groups, name) { return groups[name] = result[g[name]], groups; }, Object.create(null)); } return _inherits(BabelRegExp, RegExp), BabelRegExp.prototype.exec = function (str) { var result = _super.exec.call(this, str); return result && (result.groups = buildGroups(result, this)), result; }, BabelRegExp.prototype[Symbol.replace] = function (str, substitution) { if ("string" == typeof substitution) { var groups = _groups.get(this); return _super[Symbol.replace].call(this, str, substitution.replace(/\$<([^>]+)>/g, function (_, name) { return "$" + groups[name]; })); } if ("function" == typeof substitution) { var _this = this; return _super[Symbol.replace].call(this, str, function () { var args = arguments; return "object" != _typeof(args[args.length - 1]) && (args = [].slice.call(args)).push(buildGroups(args, _this)), substitution.apply(this, args); }); } return _super[Symbol.replace].call(this, str, substitution); }, _wrapRegExp.apply(this, arguments); }
@@ -224,8 +224,8 @@ function setupCore(G) {
   var classMap = $vs.classMap = {};
   var initMap = {};
   var autoStyles = {};
-  var initStyles = [];
-  var macroCss = [];
+  var initStyles = []; // Removed macroCss - component styles will be registered as regular classes
+
   var rootVars = {};
   var styleElement = null;
   var stylesOutput = null;
@@ -234,6 +234,8 @@ function setupCore(G) {
   var cacheDecompose = {};
   var knownAttributes = {};
   var resetListeners = [];
+  var classDependencies = {}; // Store class dependencies
+
   each(KNOWN_ATTR_NAMES.split(','), function (a) {
     return knownAttributes[a] = true;
   });
@@ -459,29 +461,402 @@ function setupCore(G) {
     }
 
     return result;
+  } // Cache for processed @apply directives
+
+
+  var applyCache = new Map();
+  /**
+   * Parse CSS string into object format
+   * @param {string} cssStr - CSS string like "color:red;font-size:16px"
+   * @returns {Object} Object with CSS properties
+   */
+
+  function parseCssString(cssStr) {
+    var styles = {};
+    if (!cssStr) return styles;
+    var props = cssStr.split(';').filter(Boolean);
+
+    for (var i = 0; i < props.length; i++) {
+      var colonIndex = props[i].indexOf(':');
+
+      if (colonIndex > 0) {
+        var propName = props[i].substring(0, colonIndex).trim();
+        var propValue = props[i].substring(colonIndex + 1).trim();
+        styles[propName] = propValue;
+      }
+    }
+
+    return styles;
   }
+  /**
+   * Process @apply directive with caching and optimizations
+   * @param {Object} styleObj - Style object that may contain @apply directives
+   * @param {Set} visitedClasses - Set of classes being processed (for circular dependency detection)
+   * @returns {Object} Processed style object with @apply resolved
+   */
+
+
+  function processApplyDirective(styleObj) {
+    var visitedClasses = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : new Set();
+    if (!isPlainObject(styleObj)) return styleObj; // Quick check if object has @apply
+
+    var hasApply = false;
+
+    for (var key in styleObj) {
+      if (key === '@apply') {
+        hasApply = true;
+        break;
+      }
+    } // If no @apply, just handle nested objects
+
+
+    if (!hasApply) {
+      var _result = {};
+      each(styleObj, function (value, key) {
+        _result[key] = isPlainObject(value) ? processApplyDirective(value, visitedClasses) : value;
+      });
+      return _result;
+    } // Check cache
+
+
+    var cacheKey = styleObj['@apply'];
+
+    if (cacheKey && applyCache.has(cacheKey) && visitedClasses.size === 0) {
+      var cached = applyCache.get(cacheKey);
+      return _objectSpread(_objectSpread({}, cached), styleObj);
+    }
+
+    var result = {};
+    var applyStyles = {}; // Process all properties
+
+    each(styleObj, function (value, key) {
+      if (key === '@apply') {
+        var classes = value.split(/\s+/).filter(Boolean);
+
+        for (var i = 0; i < classes.length; i++) {
+          var className = classes[i]; // Check for circular dependencies
+
+          if (visitedClasses.has(className)) {
+            if (C.debug) console.warn("Circular @apply reference detected: ".concat(className));
+            continue;
+          } // Add to visited set for this resolution chain
+
+
+          visitedClasses.add(className); // Resolve the class
+
+          var resolved = resolveClass(className);
+
+          if (resolved) {
+            if (isString(resolved)) {
+              Object.assign(applyStyles, parseCssString(resolved));
+            } else if (isPlainObject(resolved)) {
+              if (resolved.style) {
+                Object.assign(applyStyles, parseCssString(resolved.style));
+              } else {
+                // Direct object styles (not wrapped in { style: ... })
+                Object.assign(applyStyles, resolved);
+              }
+            }
+          } else if (C.debug) {
+            console.warn("@apply: Cannot resolve class \"".concat(className, "\""));
+          } // Remove from visited set after processing
+
+
+          visitedClasses["delete"](className);
+        }
+      } else if (isPlainObject(value)) {
+        // Recursively process nested objects
+        result[key] = processApplyDirective(value, visitedClasses);
+      } else {
+        result[key] = value;
+      }
+    }); // Merge @apply styles with other properties
+
+    result = _objectSpread(_objectSpread({}, applyStyles), result); // Cache the result if no circular dependencies
+
+    if (cacheKey && visitedClasses.size === 0) {
+      applyCache.set(cacheKey, _objectSpread({}, applyStyles));
+    }
+
+    return result;
+  } // Pre-compiled regex patterns for better performance
+
+
+  var SIMPLE_CLASS_REGEX = /^\.([a-zA-Z0-9_-]+)$/;
+  var PSEUDO_SELECTOR_REGEX = /^(\.[a-zA-Z0-9_-]+)(:[a-zA-Z-]+|\:\:[a-zA-Z-]+|\.[\w-]+)/;
+  var COMPOUND_SELECTOR_REGEX = /^(\.[a-zA-Z0-9_-]+)\s+/; // Helper to add dependency using Set for O(1) lookups
+
+  function addDependency(className, selector) {
+    if (!classDependencies[className]) {
+      classDependencies[className] = [];
+    }
+
+    if (!classDependencies[className].includes(selector)) {
+      classDependencies[className].push(selector);
+    }
+  } // Helper to register selector dependencies
+
+
+  function registerSelectorDependencies(selector) {
+    if (!selector.startsWith('.')) return;
+    var pseudoMatch = selector.match(PSEUDO_SELECTOR_REGEX);
+    var compoundMatch = selector.match(COMPOUND_SELECTOR_REGEX);
+
+    if (pseudoMatch) {
+      // Handle pseudo-class/pseudo-element dependencies
+      var baseClass = pseudoMatch[1].replace('.', '');
+      addDependency(baseClass, selector);
+    } else if (compoundMatch) {
+      // Handle compound selector dependencies
+      var parentClass = compoundMatch[1].replace('.', '');
+      addDependency(parentClass, selector);
+    }
+  }
+  /**
+   * Register CSS classes or component styles
+   * @param {string|Array|Object} keys - Class name(s) or selector->styles mapping
+   * @param {string|Object|Function} generatorOrStyle - CSS string, style object, or generator function
+   * @param {Function} initFunc - Optional initialization function
+   * 
+   * @example
+   * // Register utility class
+   * register('btn', 'display:block;')
+   * 
+   * // Register with generator
+   * register('text-', (details) => `color:${details.value}`)
+   * 
+   * // Register component styles
+   * register({
+   *   '.btn': { '@apply': 'px-4 py-2', cursor: 'pointer' },
+   *   '.btn:hover': { transform: 'scale(0.95)' }
+   * })
+   */
+
 
   function register(keys, generatorOrStyle, initFunc) {
-    if (!generatorOrStyle) return;
-    if (!isArray(keys)) keys = [keys];
-    if (isFunction(generatorOrStyle)) each(keys, function (key) {
-      return generators.unshift({
-        prefix: key,
-        generator: generatorOrStyle,
-        init: initFunc
+    // Handle single object parameter (selector -> styles mapping)
+    if (isPlainObject(keys) && arguments.length === 1) {
+      // Collect all selectors and register them as interdependent
+      var allSelectors = Object.keys(keys);
+      var classSelectors = []; // Extract all class selectors (excluding compound selectors and pseudo-elements)
+
+      for (var i = 0; i < allSelectors.length; i++) {
+        var selector = allSelectors[i];
+        var match = selector.match(SIMPLE_CLASS_REGEX);
+
+        if (match) {
+          classSelectors.push({
+            selector: selector,
+            className: match[1]
+          });
+        }
+      } // Register all class selectors as dependencies of each other
+      // This means when any class is used, all related classes in the DOM will be processed
+
+
+      if (classSelectors.length > 1) {
+        for (var _i2 = 0; _i2 < classSelectors.length; _i2++) {
+          var className = classSelectors[_i2].className;
+
+          for (var j = 0; j < allSelectors.length; j++) {
+            var depSelector = allSelectors[j];
+
+            if (depSelector !== '.' + className) {
+              addDependency(className, depSelector);
+            }
+          }
+        }
+      } // First pass: register all selectors properly and extract media queries
+
+
+      var selectorStyles = [];
+      each(keys, function (styles, selector) {
+        if (selector.startsWith('.')) {
+          // Check if styles contain media queries
+          if (isPlainObject(styles)) {
+            var baseStyles = {};
+            var mediaQueries = {}; // Separate base styles from media queries
+
+            each(styles, function (value, key) {
+              if (key.startsWith('@media')) {
+                mediaQueries[key] = value;
+              } else {
+                baseStyles[key] = value;
+              }
+            }); // Register base styles
+
+            selectorStyles.push({
+              selector: selector,
+              styles: baseStyles
+            }); // Register media query styles as separate selectors
+
+            each(mediaQueries, function (mediaStyles, mediaQuery) {
+              // Create media query selector like "@media (min-width: 640px) .selector"
+              var mediaSelector = "".concat(mediaQuery, " ").concat(selector);
+              selectorStyles.push({
+                selector: mediaSelector,
+                styles: mediaStyles
+              });
+            });
+          } else {
+            selectorStyles.push({
+              selector: selector,
+              styles: styles
+            });
+          }
+        } // Register additional dependencies using helper
+
+
+        registerSelectorDependencies(selector);
+      }); // Group selectors by base class name
+
+      var selectorsByClass = {};
+      selectorStyles.forEach(function (_ref3) {
+        var selector = _ref3.selector,
+            styles = _ref3.styles;
+        var className;
+
+        if (selector.startsWith('@media')) {
+          // Extract class name from media query selector
+          var _match = selector.match(/@media[^{]+\s+\.([a-zA-Z0-9_-]+)/);
+
+          className = _match ? _match[1] : selector;
+        } else {
+          className = selector.substring(1).split(/[\s:>\+~\[]/)[0];
+        }
+
+        if (!selectorsByClass[className]) {
+          selectorsByClass[className] = [];
+        }
+
+        selectorsByClass[className].push({
+          selector: selector,
+          styles: styles
+        });
+      }); // Register each base class with all its related selectors
+
+      each(selectorsByClass, function (selectors, className) {
+        classMap[className] = function () {
+          // When this class is used, generate styles for ALL its selectors
+          var results = [];
+          selectors.forEach(function (_ref4) {
+            var selector = _ref4.selector,
+                styles = _ref4.styles;
+            var processedStyles = styles;
+
+            if (isPlainObject(styles)) {
+              // Process @apply directive if present
+              processedStyles = processApplyDirective(styles);
+            } // Handle media query selectors specially
+
+
+            if (selector.startsWith('@media')) {
+              // Extract media query and class selector
+              var _match2 = selector.match(/^(@media[^{]+)\s+(\..+)$/);
+
+              if (_match2) {
+                var _match3 = _slicedToArray(_match2, 3),
+                    mediaQuery = _match3[1],
+                    classSelector = _match3[2];
+
+                var styleString = isPlainObject(processedStyles) ? buildCssString(processedStyles) : processedStyles;
+                results.push({
+                  selector: mediaQuery,
+                  style: "".concat(classSelector, " { ").concat(styleString, " }")
+                });
+              }
+            } else {
+              results.push({
+                selector: selector,
+                style: isPlainObject(processedStyles) ? buildCssString(processedStyles) : processedStyles
+              });
+            }
+          }); // Return array of all selector styles
+
+          return results;
+        };
       });
-    });else each(keys, function (key) {
-      classMap[key] = generatorOrStyle;
-      if (initFunc) initMap[key] = initFunc;
-    });
+      return;
+    }
+
+    if (generatorOrStyle === null || generatorOrStyle === undefined) return;
+    if (!isArray(keys)) keys = [keys];
+
+    if (isFunction(generatorOrStyle)) {
+      each(keys, function (key) {
+        return generators.unshift({
+          prefix: key,
+          generator: generatorOrStyle,
+          init: initFunc
+        });
+      });
+    } else {
+      // Create generator functions for style objects to enable dynamic @apply processing
+      each(keys, function (key) {
+        if (isPlainObject(generatorOrStyle)) {
+          // Check if styles contain @apply
+          var hasApply = ('@apply' in generatorOrStyle);
+          classMap[key] = hasApply ? function () {
+            return processApplyDirective(generatorOrStyle);
+          } // Dynamic processing
+          : processApplyDirective(generatorOrStyle); // Process once
+        } else {
+          classMap[key] = generatorOrStyle;
+        }
+
+        if (initFunc) initMap[key] = initFunc; // Auto-register dependencies for pseudo-classes and pseudo-elements
+
+        if (key.includes(':') || key.includes('::')) {
+          var pseudoMatch = key.match(/^([a-zA-Z0-9_-]+)(:[a-zA-Z-]+|::[a-zA-Z-]+)/);
+
+          if (pseudoMatch) {
+            var baseClass = pseudoMatch[1];
+
+            if (!classDependencies[baseClass]) {
+              classDependencies[baseClass] = [];
+            }
+
+            if (!classDependencies[baseClass].includes(key)) {
+              classDependencies[baseClass].push(key);
+            }
+          }
+        }
+      });
+    }
   }
 
   function resolveClass(className) {
-    if (!className) return null;
+    if (!className) return null; // First try to resolve the full className (for cases like 'card:hover')
+
+    var style = classMap[className];
+
+    if (style) {
+      // If style is a function (generator), call it with decomposed details
+      if (isFunction(style)) {
+        var _classDetails = decomposeClassName(className);
+
+        style = style(_classDetails);
+      }
+
+      if (style && initMap[className]) {
+        var _classDetails2 = decomposeClassName(className);
+
+        initMap[className](_classDetails2);
+      }
+
+      return style;
+    } // If not found, decompose and try base name
+
+
     var classDetails = decomposeClassName(className);
     var cdn = classDetails.name;
-    var style = classMap[cdn];
-    if (style && initMap[cdn]) initMap[cdn](classDetails);
+    style = classMap[cdn]; // If style is a function (generator), call it to get the actual style
+
+    if (isFunction(style)) {
+      style = style(classDetails);
+    }
+
+    if (style && initMap[cdn]) initMap[cdn](classDetails); // Try generators if no direct class mapping found
 
     for (var i = 0; !style && i < generators.length; i++) {
       var gi = generators[i];
@@ -494,14 +869,27 @@ function setupCore(G) {
 
     if (!style && C.debug) console.log("Unknown class: ".concat(className));
     return style;
-  }
+  } // Removed addMacroCss - no longer needed
 
-  function addMacroCss(css) {
-    if (isPlainObject(css)) macroCss.push(css);else if (isArray(css)) macroCss.push.apply(macroCss, _toConsumableArray(css));
-  }
 
   function addRootVars(vars) {
     rootVars = _objectSpread(_objectSpread({}, rootVars), vars);
+  } // CSS builder utility for efficient string concatenation
+
+
+  function buildCssString(styleObj) {
+    var props = [];
+
+    for (var prop in styleObj) {
+      if (styleObj.hasOwnProperty(prop)) {
+        // Skip media queries and other nested objects - they should be handled separately
+        if (!prop.startsWith('@') && !isPlainObject(styleObj[prop])) {
+          props.push("".concat(prop, ":").concat(styleObj[prop]));
+        }
+      }
+    }
+
+    return props.length ? props.join(';') + ';' : '';
   }
 
   function updateAutoStyles() {
@@ -511,16 +899,8 @@ function setupCore(G) {
     var all = initStyles;
     each(keys, function (k) {
       return all = all.concat(autoStyles[k]);
-    });
-    var macroStyles = [];
-    each(macroCss, function (css) {
-      each(css, function (macro, selectors) {
-        var extended = macro.split(' ').map(function (cls) {
-          return resolveClass(cls);
-        }).join('');
-        macroStyles.push("".concat(selectors, " {").concat(extended, "}"));
-      });
-    });
+    }); // Removed macro styles processing - components are now registered as regular classes
+
     var varDefs = [];
     each(rootVars, function (v, k) {
       if (!k.startsWith('--')) k = '--' + k;
@@ -528,19 +908,31 @@ function setupCore(G) {
     });
 
     if (varDefs.length > 0) {
-      macroStyles.push(":root{\n".concat(varDefs.join('\n'), "\n}"));
-    }
+      all.push(":root{\n".concat(varDefs.join('\n'), "\n}"));
+    } // Macro styles are now handled as regular classes
 
-    all = all.concat(macroStyles);
 
     if (all.length > 0) {
       var newStyles = (C.preset ? [C.preset] : []).concat(all).join('\n');
 
       if (newStyles !== stylesOutput) {
+        stylesOutput = newStyles;
+
         if (G.document) {
-          if (styleElement) styleElement.innerHTML = stylesOutput = newStyles;else setTimeout(updateAutoStyles);
-        } else {
-          stylesOutput = newStyles;
+          if (styleElement) {
+            styleElement.innerHTML = newStyles;
+          } else {
+            setTimeout(updateAutoStyles);
+          } // Remove vs-cloak from all elements after styles are loaded
+
+
+          if (!$vs.config._vsCloakRemoved && newStyles) {
+            $vs.config._vsCloakRemoved = true;
+            var cloakedElements = G.document.querySelectorAll('[vs-cloak]');
+            cloakedElements.forEach(function (el) {
+              return el.removeAttribute('vs-cloak');
+            });
+          }
         }
       }
     }
@@ -565,34 +957,74 @@ function setupCore(G) {
       }
       each(classes, function (name) {
         name = name.trim();
-        if (!name || addedClasses[name]) return;
+        if (!name || addedClasses[name]) return; // Check for class dependencies
+
+        if (classDependencies[name]) {
+          // Generate dependent classes
+          var deps = Array.isArray(classDependencies[name]) ? classDependencies[name] : Array.from(classDependencies[name]);
+          deps.forEach(function (dep) {
+            if (!addedClasses[dep]) {
+              // Recursively add dependent classes with original dependency name
+              addClasses([dep], false);
+            }
+          });
+        }
+
         var style = resolveClass(name);
 
-        if (style) {
-          var surfix = '';
+        if (style !== null && style !== undefined) {
+          // Handle array of styles (from multi-selector registration)
+          if (isArray(style)) {
+            addedClasses[name] = true;
+            var bpStyles = autoStyles[''];
+            if (!bpStyles) bpStyles = autoStyles[''] = [];
+            style.forEach(function (item) {
+              if (item.selector && item.style) {
+                bpStyles.push("".concat(item.selector, " {").concat(item.style, "}"));
+              }
+            });
+          } else {
+            var surfix = ''; // Handle component selector format
 
-          if (style.name) {
-            if (style.name.indexOf('$') == 0) {
-              surfix = style.name.substring(1);
+            if (style.selector && style.style) {
+              // This is from object syntax registration
+              addedClasses[name] = true;
+              var _bpStyles = autoStyles[''];
+              if (!_bpStyles) _bpStyles = autoStyles[''] = [];
+
+              _bpStyles.push("".concat(style.selector, " {").concat(style.style, "}"));
+            } else {
+              // Original logic for regular classes
+              if (style.name) {
+                if (style.name.indexOf('$') == 0) {
+                  surfix = style.name.substring(1);
+                }
+
+                style = style.style;
+              } // Convert style object to CSS string if needed
+
+
+              if (isPlainObject(style)) {
+                style = buildCssString(style);
+              }
+
+              var classDetails = decomposeClassName(name, surfix);
+              style = classDetails.template.replace('${style}', style);
+              addedClasses[name] = true;
+              var _bpStyles2 = autoStyles[classDetails.breakpoint || ''];
+              if (!_bpStyles2) _bpStyles2 = autoStyles[classDetails.breakpoint || ''] = [];
+
+              _bpStyles2.push(style);
             }
-
-            style = style.style;
           }
-
-          var classDetails = decomposeClassName(name, surfix);
-          style = classDetails.template.replace('${style}', style);
-          addedClasses[name] = true;
-          var bpStyles = autoStyles[classDetails.breakpoint || ''];
-          if (!bpStyles) bpStyles = autoStyles[classDetails.breakpoint || ''] = [];
-          bpStyles.push(style);
         }
       });
-      if (update) updateAutoStyles();
     }
+
+    if (update) updateAutoStyles();
   }
 
   function recordKnownClasses(el) {
-    var update = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;
     var prefix = C.prefix + ':';
     var classes = [];
     var classesFromAttrs = [];
@@ -603,6 +1035,25 @@ function setupCore(G) {
 
       if (cn.baseVal) classes.push(cn.baseVal);
       if (cn.animVal) classes.push(cn.animVal);
+    } // Check for compound selectors
+
+
+    var elClasses = Array.from(el.classList || []);
+    var parent = el.parentElement;
+
+    if (parent) {
+      var parentClasses = Array.from(parent.classList || []);
+      parentClasses.forEach(function (parentCls) {
+        elClasses.forEach(function (childCls) {
+          var compound = "".concat(parentCls, " ").concat(childCls);
+
+          if (classDependencies[compound]) {
+            classDependencies[compound].forEach(function (depCls) {
+              classes.push(depCls);
+            });
+          }
+        });
+      });
     }
 
     each(el.attributes, function (a) {
@@ -714,6 +1165,7 @@ function setupCore(G) {
     autoStyles = {};
     stylesOutput = null;
     cache = {};
+    $vs.config._vsCloakRemoved = false; // Reset cloak removal flag
 
     if (styleElement) {
       styleElement.innerHTML = null;
@@ -766,6 +1218,272 @@ function setupCore(G) {
         g = rgb.g,
         b = rgb.b;
     return ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
+  } // Parse CSS color values (hex, rgb, rgba, hsl, hsla, CSS variables)
+
+
+  function parseColor(color) {
+    if (!color || typeof color !== 'string') return null;
+    color = color.trim(); // Handle CSS variables
+
+    if (color.startsWith('var(')) {
+      var match = color.match(/var\(([^)]+)\)/);
+
+      if (match && G.getComputedStyle) {
+        var varName = match[1].trim();
+        var computed = G.getComputedStyle(G.document.documentElement).getPropertyValue(varName);
+        if (computed) return parseColor(computed);
+      }
+
+      return null;
+    } // Handle hex colors
+
+
+    if (color[0] === '#') {
+      var rgb = hexToRgb(color);
+      if (rgb) return _objectSpread(_objectSpread({}, rgb), {}, {
+        a: 1
+      });
+    } // Handle rgb/rgba
+
+
+    var rgbMatch = color.match(/rgba?\((\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?)(?:,\s*(\d+(?:\.\d+)?))?\)/);
+
+    if (rgbMatch) {
+      return {
+        r: Math.round(parseFloat(rgbMatch[1])),
+        g: Math.round(parseFloat(rgbMatch[2])),
+        b: Math.round(parseFloat(rgbMatch[3])),
+        a: rgbMatch[4] ? parseFloat(rgbMatch[4]) : 1
+      };
+    } // Handle hsl/hsla
+
+
+    var hslMatch = color.match(/hsla?\((\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?)%,\s*(\d+(?:\.\d+)?)%(?:,\s*(\d+(?:\.\d+)?))?\)/);
+
+    if (hslMatch) {
+      var h = parseFloat(hslMatch[1]) / 360;
+      var s = parseFloat(hslMatch[2]) / 100;
+      var l = parseFloat(hslMatch[3]) / 100;
+      var a = hslMatch[4] ? parseFloat(hslMatch[4]) : 1;
+
+      var _rgb = hslToRgb(h, s, l);
+
+      return _objectSpread(_objectSpread({}, _rgb), {}, {
+        a: a
+      });
+    } // Handle named colors (basic set)
+
+
+    var namedColors = {
+      transparent: {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 0
+      },
+      white: {
+        r: 255,
+        g: 255,
+        b: 255,
+        a: 1
+      },
+      black: {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 1
+      },
+      red: {
+        r: 255,
+        g: 0,
+        b: 0,
+        a: 1
+      },
+      green: {
+        r: 0,
+        g: 128,
+        b: 0,
+        a: 1
+      },
+      blue: {
+        r: 0,
+        g: 0,
+        b: 255,
+        a: 1
+      } // Add more as needed
+
+    };
+
+    if (namedColors[color.toLowerCase()]) {
+      return namedColors[color.toLowerCase()];
+    }
+
+    return null;
+  } // Convert HSL to RGB
+
+
+  function hslToRgb(h, s, l) {
+    var r, g, b;
+
+    if (s === 0) {
+      r = g = b = l; // Achromatic
+    } else {
+      var hue2rgb = function hue2rgb(p, q, t) {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1 / 6) return p + (q - p) * 6 * t;
+        if (t < 1 / 2) return q;
+        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+        return p;
+      };
+
+      var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      var p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1 / 3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1 / 3);
+    }
+
+    return {
+      r: Math.round(r * 255),
+      g: Math.round(g * 255),
+      b: Math.round(b * 255)
+    };
+  } // Convert RGB to HSL
+
+
+  function rgbToHsl(r, g, b) {
+    r /= 255;
+    g /= 255;
+    b /= 255;
+    var max = Math.max(r, g, b);
+    var min = Math.min(r, g, b);
+    var h,
+        s,
+        l = (max + min) / 2;
+
+    if (max === min) {
+      h = s = 0; // Achromatic
+    } else {
+      var d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+
+      switch (max) {
+        case r:
+          h = (g - b) / d + (g < b ? 6 : 0);
+          break;
+
+        case g:
+          h = (b - r) / d + 2;
+          break;
+
+        case b:
+          h = (r - g) / d + 4;
+          break;
+      }
+
+      h /= 6;
+    }
+
+    return {
+      h: h * 360,
+      s: s * 100,
+      l: l * 100
+    };
+  } // Mix two colors (similar to CSS color-mix)
+
+
+  function colorMix(color1, color2) {
+    var amount = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 50;
+    var colorSpace = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 'srgb';
+    var c1 = typeof color1 === 'string' ? parseColor(color1) : color1;
+    var c2 = typeof color2 === 'string' ? parseColor(color2) : color2;
+    if (!c1 || !c2) return null;
+    var ratio = amount / 100;
+    var invRatio = 1 - ratio;
+
+    if (colorSpace === 'srgb' || colorSpace === 'rgb') {
+      // Mix in RGB space
+      return {
+        r: Math.round(c1.r * ratio + c2.r * invRatio),
+        g: Math.round(c1.g * ratio + c2.g * invRatio),
+        b: Math.round(c1.b * ratio + c2.b * invRatio),
+        a: c1.a * ratio + c2.a * invRatio
+      };
+    } else if (colorSpace === 'hsl') {
+      // Mix in HSL space
+      var hsl1 = rgbToHsl(c1.r, c1.g, c1.b);
+      var hsl2 = rgbToHsl(c2.r, c2.g, c2.b); // Handle hue interpolation (shortest path)
+
+      var h1 = hsl1.h;
+      var h2 = hsl2.h;
+      var diff = Math.abs(h1 - h2);
+
+      if (diff > 180) {
+        if (h1 > h2) h2 += 360;else h1 += 360;
+      }
+
+      var mixedHsl = {
+        h: (h1 * ratio + h2 * invRatio) % 360,
+        s: hsl1.s * ratio + hsl2.s * invRatio,
+        l: hsl1.l * ratio + hsl2.l * invRatio
+      };
+      var rgb = hslToRgb(mixedHsl.h / 360, mixedHsl.s / 100, mixedHsl.l / 100);
+      return _objectSpread(_objectSpread({}, rgb), {}, {
+        a: c1.a * ratio + c2.a * invRatio
+      });
+    } // Default to RGB mixing
+
+
+    return colorMix(color1, color2, amount, 'srgb');
+  } // Adjust color lightness
+
+
+  function adjustLightness(color, amount) {
+    var c = typeof color === 'string' ? parseColor(color) : color;
+    if (!c) return null;
+    var hsl = rgbToHsl(c.r, c.g, c.b);
+    hsl.l = Math.max(0, Math.min(100, hsl.l + amount));
+    var rgb = hslToRgb(hsl.h / 360, hsl.s / 100, hsl.l / 100);
+    return _objectSpread(_objectSpread({}, rgb), {}, {
+      a: c.a
+    });
+  } // Adjust color saturation
+
+
+  function adjustSaturation(color, amount) {
+    var c = typeof color === 'string' ? parseColor(color) : color;
+    if (!c) return null;
+    var hsl = rgbToHsl(c.r, c.g, c.b);
+    hsl.s = Math.max(0, Math.min(100, hsl.s + amount));
+    var rgb = hslToRgb(hsl.h / 360, hsl.s / 100, hsl.l / 100);
+    return _objectSpread(_objectSpread({}, rgb), {}, {
+      a: c.a
+    });
+  } // Darken color (convenience function)
+
+
+  function darken(color) {
+    var amount = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 10;
+    return colorMix(color, 'black', 100 - amount);
+  } // Lighten color (convenience function)
+
+
+  function lighten(color) {
+    var amount = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 10;
+    return colorMix(color, 'white', 100 - amount);
+  } // Convert color to CSS string
+
+
+  function colorToString(color) {
+    if (!color) return null;
+    if (typeof color === 'string') return color;
+
+    if (color.a !== undefined && color.a < 1) {
+      return "rgba(".concat(color.r, ", ").concat(color.g, ", ").concat(color.b, ", ").concat(color.a, ")");
+    }
+
+    return "#".concat(rgbToHex(color));
   }
 
   function hexToHsv(hex) {
@@ -885,11 +1603,11 @@ function setupCore(G) {
 
     patterns.push(primaryColor);
 
-    for (var _i2 = 1; _i2 <= darkColorCount; _i2++) {
+    for (var _i3 = 1; _i3 <= darkColorCount; _i3++) {
       patterns.push({
-        h: getHue(hsv, _i2),
-        s: getSaturation(hsv, _i2),
-        v: getValue(hsv, _i2)
+        h: getHue(hsv, _i3),
+        s: getSaturation(hsv, _i3),
+        v: getValue(hsv, _i3)
       });
     }
 
@@ -972,7 +1690,8 @@ function setupCore(G) {
     register("".concat(classNamePrefix, "-"), function (classDetails) {
       var color = classDetails.name.substring(classNamePrefix.length + 1);
       var cv = resolveColor(color);
-      if (!cv) return null;
+      if (!cv) return null; // Keep original behavior for opacity variable compatibility
+
       var style = isString(cv) ? "".concat(styleName, ": ").concat(cv, ";") : "".concat(undefined === cv.a ? "".concat(vn, ":1;") : '').concat(styleName, ": rgba(").concat(cv.r, ",").concat(cv.g, ",").concat(cv.b, ",").concat(undefined === cv.a ? "var(".concat(vn, ")") : cv.a, ");");
       return nameAffix ? {
         name: "$".concat(nameAffix),
@@ -990,9 +1709,9 @@ function setupCore(G) {
     }
 
     each([2, 3, 4, 5, 6, 12], function (max) {
-      for (var _i3 = 1; _i3 < max; _i3++) {
-        var name = "".concat(_i3, "/").concat(max);
-        var value = "".concat(+(_i3 * 100 / max).toFixed(6), "%");
+      for (var _i4 = 1; _i4 < max; _i4++) {
+        var name = "".concat(_i4, "/").concat(max);
+        var value = "".concat(+(_i4 * 100 / max).toFixed(6), "%");
         handler(name, value);
       }
     });
@@ -1009,6 +1728,15 @@ function setupCore(G) {
   extend($vs._, {
     hexToRgb: hexToRgb,
     rgbToHex: rgbToHex,
+    parseColor: parseColor,
+    hslToRgb: hslToRgb,
+    rgbToHsl: rgbToHsl,
+    colorMix: colorMix,
+    adjustLightness: adjustLightness,
+    adjustSaturation: adjustSaturation,
+    darken: darken,
+    lighten: lighten,
+    colorToString: colorToString,
     resolveColor: resolveColor,
     hexToPalette: hexToPalette,
     generateColors: generateColors,
@@ -1026,7 +1754,6 @@ function setupCore(G) {
     reset: resetStyles,
     extract: extractClasses,
     add: addClasses,
-    addMacroCss: addMacroCss,
     addRootVars: addRootVars,
     resolveAll: resolveAll,
     register: register
