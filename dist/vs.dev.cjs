@@ -1,4 +1,4 @@
-// Vimesh Style v1.2.0
+// Vimesh Style v1.2.1
 
 function setupCore(G) {
     if (G.$vs) return // Vimesh style core is already loaded    
